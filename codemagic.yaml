@@ -1,0 +1,46 @@
+workflows:
+  ios-unsigned:
+    name: iOS Unsigned IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      vars:
+        SCHEME: "3105"
+        BUILD_REF: "ThreeOneOSFive.xcodeproj"
+    scripts:
+      - name: Listar schemes
+        script: |
+          set -e
+          xcodebuild -project "$BUILD_REF" -list
+
+      - name: Compilar app sem assinatura
+        script: |
+          set -e
+          rm -rf "$CM_BUILD_DIR/build"
+          mkdir -p "$CM_BUILD_DIR/build"
+          xcodebuild \
+            -project "$BUILD_REF" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$CM_BUILD_DIR/build/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Criar IPA unsigned
+        script: |
+          set -e
+          APP_PATH=$(find "$CM_BUILD_DIR/build/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -name "*.app" | head -n 1)
+          test -n "$APP_PATH"
+          OUT_DIR="$CM_BUILD_DIR/build/ipa"
+          mkdir -p "$OUT_DIR/Payload"
+          cp -R "$APP_PATH" "$OUT_DIR/Payload/"
+          cd "$OUT_DIR"
+          zip -qry "$CM_BUILD_DIR/build/3105-unsigned.ipa" Payload
+
+    artifacts:
+      - build/3105-unsigned.ipa
