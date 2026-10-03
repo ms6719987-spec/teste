@@ -13,6 +13,18 @@ private enum WallpaperPackagePickerPolicy {
     static let allowedContentTypes: [UTType] = [packageType, .data]
 }
 
+private enum GameOption: String {
+    case freeFire = "Free Fire"
+    case freeFireMax = "Free Fire Max"
+}
+
+private enum PatchCategory: String, CaseIterable {
+    case all = "Todos"
+    case hs = "HS"
+    case aimbot = "AIMBOT"
+    case textura = "TEXTURA"
+}
+
 struct PatchProjectsView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var draftCoordinator: PatchDraftCoordinator
@@ -23,6 +35,8 @@ struct PatchProjectsView: View {
     @State private var showWallpaperImporter = false
     @State private var showCleaner = false
     @State private var searchText = ""
+    @State private var selectedGame: GameOption = .freeFire
+    @State private var selectedCategory: PatchCategory = .all
     @State private var wallpaperPackages: [WallpaperStagedPackage] = []
     @State private var wallpaperImportFeedback: WallpaperImportFeedback?
     @State private var wallpaperPendingDeletion: WallpaperStagedPackage?
@@ -95,6 +109,15 @@ struct PatchProjectsView: View {
                     prompt: language.text("installed.search"),
                     clearLabel: language.text("common.clear")
                 )
+
+                HStack(spacing: 10) {
+                    gameOptionButton(.freeFire)
+                    gameOptionButton(.freeFireMax)
+                    categoryMenu
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
                 Divider()
                 List {
                     if !hasLocalContent && (store.isBusy || isImportingWallpapers) {
@@ -155,43 +178,6 @@ struct PatchProjectsView: View {
             }
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button {
-                            showCreate = true
-                        } label: {
-                            Label(language.text("patch.new"), systemImage: "doc.badge.plus")
-                        }
-                        Button {
-                            showImporter = true
-                        } label: {
-                            Label(language.text("patch.import"), systemImage: "square.and.arrow.down")
-                        }
-                        Button {
-                            showWallpaperImporter = true
-                        } label: {
-                            Label(
-                                language.text("wallpaper.import"),
-                                systemImage: "photo.badge.plus"
-                            )
-                        }
-                    } label: {
-                        if store.isBusy || isImportingWallpapers {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "plus")
-                        }
-                    }
-                    .disabled(store.isBusy || isImportingWallpapers)
-                    .accessibilityLabel(language.text("patch.add"))
-                }
-                AppUtilityToolbar(
-                    language: language,
-                    onOpenSettings: onOpenSettings,
-                    onOpenLogs: onOpenLogs
-                )
-            }
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
                     allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -297,6 +283,68 @@ struct PatchProjectsView: View {
         }
     }
 
+    private var categoryMenu: some View {
+        Menu {
+            ForEach(PatchCategory.allCases, id: \.self) { category in
+                Button {
+                    selectedCategory = category
+                } label: {
+                    HStack {
+                        Text(category.rawValue)
+                        if selectedCategory == category {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 42, height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(Color.clear)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if selectedCategory != .all {
+                        Circle()
+                            .fill(AppTheme.accent)
+                            .frame(width: 7, height: 7)
+                            .offset(x: -2, y: 2)
+                    }
+                }
+                .accessibilityLabel("Filtro de categoria")
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func gameOptionButton(_ option: GameOption) -> some View {
+        Button {
+            selectedGame = option
+        } label: {
+            Text(option.rawValue)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(selectedGame == option ? Color.white : AppTheme.accent)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(selectedGame == option ? AppTheme.accent : Color.clear)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
     private func consumeExternalImport() {
         guard let request = draftCoordinator.importRequest else { return }
         draftCoordinator.clearImport()
@@ -304,27 +352,16 @@ struct PatchProjectsView: View {
     }
 
     private func wallpaperRow(_ package: WallpaperStagedPackage) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             AppRowIcon(systemName: wallpaperSymbol)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(package.displayName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                InstalledContentKindBadge(kind: .wallpaper, language: language)
-                Text(language.text(
-                    "wallpaper.package_summary",
-                    Int64(package.payload.descriptors.count),
-                    ByteCountFormatter.string(
-                        fromByteCount: package.payload.totalBytes,
-                        countStyle: .file
-                    )
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
+            Text(package.displayName)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
         }
-        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .padding(.vertical, 1)
     }
 
     private var cleanerRow: some View {
@@ -421,15 +458,22 @@ struct PatchProjectsView: View {
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem) -> some View {
         if item.isLocked {
-            Button { store.requestUnlock(for: item) } label: {
+            Button {
+                store.requestUnlock(for: item)
+            } label: {
                 PatchProjectRow(item: item, language: language)
             }
             .buttonStyle(.plain)
         } else {
-            NavigationLink {
-                PatchProjectDetailView(store: store, projectID: item.id)
-            } label: {
-                PatchProjectRow(item: item, language: language)
+            HStack(spacing: 10) {
+                NavigationLink {
+                    PatchProjectDetailView(store: store, projectID: item.id)
+                } label: {
+                    PatchProjectRow(item: item, language: language)
+                }
+                .buttonStyle(.plain)
+
+                PatchActivationToggle(item: item)
             }
         }
     }
@@ -490,55 +534,45 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
-
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.project?.name ?? language.text("patch.locked_project"))
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                InstalledContentKindBadge(kind: .patch, language: language)
-                if let author = item.project?.author, !author.isEmpty {
-                    Text(language.text("patch.by_author", author))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text(rowDetail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if item.summary.isPasswordProtected {
-                Image(systemName: "key.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel(language.text("patch.password_protected"))
-            }
-            if item.project?.isPrivate == true {
-                Image(systemName: "eye.slash.fill")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.accent)
-                    .accessibilityLabel(language.text("patch.private"))
-            }
+            Text(item.project?.name ?? language.text("patch.locked_project"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
         }
-        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .padding(.vertical, 1)
+    }
+}
+
+private struct PatchActivationToggle: View {
+    let item: PatchLibraryItem
+    @State private var isEnabled: Bool
+
+    init(item: PatchLibraryItem) {
+        self.item = item
+        let rules = item.project?.rules ?? []
+        _isEnabled = State(
+            initialValue: rules.isEmpty || rules.allSatisfy {
+                PatchRuleActivationStore.shared.isEnabled($0.id)
+            }
+        )
     }
 
-    private var rowDetail: String {
-        if item.isLocked {
-            return language.text("patch.tap_to_unlock")
-        }
-        if item.project?.isPrivate == true, !item.isAuthorCopy {
-            return language.text("patch.private_received")
-        }
-        return language.text(
-            item.summary.schemaVersion >= 2
-                ? "patch.workspace_items_count"
-                : "patch.rules_count",
-            Int64((item.project?.rules.count ?? 0) + (item.project?.directories.count ?? 0))
-        )
+    var body: some View {
+        Toggle("", isOn: $isEnabled)
+            .labelsHidden()
+            .tint(AppTheme.accent)
+            .accessibilityLabel(Text(item.project?.name ?? "Patch"))
+            .onChange(of: isEnabled) { enabled in
+                guard let rules = item.project?.rules else { return }
+                for rule in rules {
+                    PatchRuleActivationStore.shared.setEnabled(enabled, for: rule.id)
+                }
+            }
     }
 }
 
