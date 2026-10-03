@@ -1,0 +1,6 @@
+Tema: vermelho
+Abas removidas: Files e Wallpapers
+Nome do app: Netflix
+Ícone: N vermelho sobre fundo preto
+Toggle Apply/Restore: preservado
+Exportar: preservado
