@@ -60,7 +60,7 @@ struct ThreeOneOSFiveApp: App {
                 .onOpenURL { url in patchDraftCoordinator.presentImport(url) }
         }
     }
-
+}
 
 class AppState: ObservableObject {
     @Published var exploitStatus: ExploitStatus = .notStarted
