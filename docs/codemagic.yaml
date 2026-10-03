@@ -1,0 +1,27 @@
+# Codemagic configuration for a signed iOS IPA.
+# Before running this workflow, configure iOS code-signing identities
+# (certificate + provisioning profile) in Codemagic.
+workflows:
+  ios-signed:
+    name: iOS Signed IPA
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.apple.mobile.MobileHouseArrest
+      xcode: latest
+
+    scripts:
+      - name: Apply signing profiles
+        script: xcode-project use-profiles
+      - name: Build signed IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/ThreeOneOSFive.xcodeproj" \
+            --scheme "3105"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
