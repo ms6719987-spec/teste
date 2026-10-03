@@ -549,8 +549,8 @@ struct PatchProjectsView: View {
                 await MainActor.run {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
-                        messageKey: privateErrorKey(for: error),
-                        messageArgument: privateErrorArgument(for: error)
+                        messageKey: error.localizationKey,
+                        messageArgument: error.localizationArgument
                     )
                 }
             } catch {
@@ -591,8 +591,8 @@ struct PatchProjectsView: View {
                 await MainActor.run {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
-                        messageKey: privateErrorKey(for: error),
-                        messageArgument: privateErrorArgument(for: error)
+                        messageKey: error.localizationKey,
+                        messageArgument: error.localizationArgument
                     )
                 }
             } catch {
