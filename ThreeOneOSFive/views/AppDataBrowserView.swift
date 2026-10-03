@@ -14,9 +14,17 @@ struct AppDataBrowserView: View {
     @State private var hasLoaded = false
     @State private var workspaceURL: URL?
     @Binding private var tabSession: FilesTabSession
+    let onOpenSettings: () -> Void
+    let onOpenLogs: () -> Void
 
-    init(tabSession: Binding<FilesTabSession>) {
+    init(
+        tabSession: Binding<FilesTabSession>,
+        onOpenSettings: @escaping () -> Void = {},
+        onOpenLogs: @escaping () -> Void = {}
+    ) {
         _tabSession = tabSession
+        self.onOpenSettings = onOpenSettings
+        self.onOpenLogs = onOpenLogs
     }
 
     private var filteredApps: [InstalledApp] {
@@ -39,7 +47,12 @@ struct AppDataBrowserView: View {
     }
 
     var body: some View {
-        NavigationStack(path: activeNavigationPath) {
+        navigationContent(tabID: tabSession.selectedTabID)
+            .id(tabSession.selectedTabID)
+    }
+
+    private func navigationContent(tabID: UUID) -> some View {
+        NavigationStack(path: navigationPath(for: tabID)) {
             appList
             .navigationTitle(language.text("browser.title"))
             .navigationBarTitleDisplayMode(.inline)
@@ -58,6 +71,11 @@ struct AppDataBrowserView: View {
                     .disabled(isResolving)
                     .accessibilityLabel(language.text("browser.retry"))
                 }
+                AppUtilityToolbar(
+                    language: language,
+                    onOpenSettings: onOpenSettings,
+                    onOpenLogs: onOpenLogs
+                )
             }
             .onAppear {
                 if workspaceURL == nil {
@@ -90,10 +108,10 @@ struct AppDataBrowserView: View {
         }
     }
 
-    private var activeNavigationPath: Binding<[FileBrowserDestination]> {
+    private func navigationPath(for tabID: UUID) -> Binding<[FileBrowserDestination]> {
         Binding(
-            get: { tabSession.activeTab?.navigationPath ?? [] },
-            set: { tabSession.setActiveNavigationPath($0) }
+            get: { tabSession.navigationPath(for: tabID) },
+            set: { tabSession.setNavigationPath($0, for: tabID) }
         )
     }
 
@@ -234,7 +252,7 @@ struct AppDataBrowserView: View {
     private var emptyView: some View {
         VStack(spacing: 16) {
             Image(systemName: "folder.badge.questionmark")
-                .font(.system(size: AppTheme.emptyIconSize, weight: .light, design: .rounded))
+                .font(.system(size: AppTheme.emptyIconSize, weight: .light))
                 .foregroundStyle(.secondary)
             Text(errorMessage ?? language.text("browser.empty"))
                 .font(.subheadline)
@@ -250,7 +268,7 @@ struct AppDataBrowserView: View {
     private var searchEmptyView: some View {
         VStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: AppTheme.emptyIconSize, weight: .light, design: .rounded))
+                .font(.system(size: AppTheme.emptyIconSize, weight: .light))
                 .foregroundStyle(.secondary)
             Text(language.text("browser.search_empty"))
                 .font(.subheadline.weight(.medium))
@@ -400,7 +418,7 @@ struct BrowserAppIcon: View {
                     .scaledToFill()
             } else {
                 Image(systemName: "app")
-                    .font(.system(size: AppTheme.rowIconSize, weight: .medium, design: .rounded))
+                    .font(.system(size: AppTheme.rowIconSize, weight: .medium))
                     .foregroundStyle(.secondary)
             }
         }

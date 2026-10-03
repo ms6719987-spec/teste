@@ -6,49 +6,58 @@ struct ThreeOneOSFiveApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var patchDraftCoordinator = PatchDraftCoordinator()
     @StateObject private var fileOperationCoordinator = FileOperationCoordinator()
-    @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
+    @StateObject private var patchStore = PatchProjectStore()
+    @StateObject private var repositoryStore = PackageRepositoryStore()
+    @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.portuguese.rawValue
     @State private var showAttribution = false
+    @State private var updateOffer: AppUpdateChecker.Offer?
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        configureTabBarAppearance()
         setupLogCapture()
         log("app: 3105 launching — iOS \(AppInfo.osVersion) (\(AppInfo.osBuild)) \(AppInfo.machineName)")
     }
 
     private var language: AppLanguage {
-        AppLanguage(rawValue: languageCode) ?? .english
+        AppLanguage(rawValue: languageCode) ?? .portuguese
     }
 
-
-    private func configureTabBarAppearance() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundColor = .clear
-        appearance.shadowColor = .clear
-        appearance.shadowImage = UIImage()
-
-        UITabBar.appearance().standardAppearance = appearance
-        if #available(iOS 15.0, *) {
-            UITabBar.appearance().scrollEdgeAppearance = appearance
+    private func checkForUpdate() {
+        Task {
+            guard let offer = await AppUpdateChecker.check() else { return }
+            await MainActor.run { updateOffer = offer }
         }
     }
 
-
     var body: some Scene {
         WindowGroup {
-            NetflixCoverView()
+            ContentView()
                 .environmentObject(appState)
                 .environmentObject(patchDraftCoordinator)
                 .environmentObject(fileOperationCoordinator)
+                .environmentObject(patchStore)
+                .environmentObject(repositoryStore)
                 .environment(\.appLanguage, language)
                 .environment(\.locale, language.locale)
                 .displayIdentityAttribution(isPresented: $showAttribution, enabled: true)
                 .sheet(isPresented: $showAttribution) {
                     DisplayAttributionSheet()
                 }
+                .alert(item: $updateOffer) { offer in
+                    Alert(
+                        title: Text(language.text("update.title")),
+                        message: Text(language.text("update.message", offer.version)),
+                        primaryButton: .default(Text(language.text("update.agree"))) {
+                            UIApplication.shared.open(offer.url)
+                        },
+                        secondaryButton: .cancel(Text(language.text("update.dismiss"))) {
+                            AppUpdateChecker.dismiss(version: offer.version)
+                        }
+                    )
+                }
                 .onAppear {
                     appState.detectSupport()
+                    checkForUpdate()
                 }
                 .onChange(of: scenePhase) { phase in
                     guard phase == .active else { return }
@@ -59,6 +68,7 @@ struct ThreeOneOSFiveApp: App {
                 }
         }
     }
+
 }
 
 class AppState: ObservableObject {
@@ -77,12 +87,7 @@ class AppState: ObservableObject {
         )
     }
 
-    var isSupported: Bool {
-        if AppInfo.osVersion == "26.6.2" {
-            return true
-        }
-        return unsupportedMessage == nil
-    }
+    var isSupported: Bool { unsupportedMessage == nil }
 
     func detectSupport() {
         let v = AppInfo.versionTuple
