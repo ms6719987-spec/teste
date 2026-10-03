@@ -78,29 +78,21 @@ struct PatchProjectEditorView: View {
 
                 if existingProject != nil || !rules.isEmpty || !directories.isEmpty {
                     Section {
-                    ForEach($rules) { $rule in
-                        HStack(spacing: 10) {
-                            Button { ruleEditor = PatchRuleEditorContext(rule: rule) } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: rule.isEnabled ? "doc.fill" : "doc")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundStyle(rule.isEnabled ? AppTheme.accent : .secondary)
-                                        .frame(width: 28, height: 28)
-                                    Text(rule.replacementFilename.isEmpty ? (rule.relativePath as NSString).lastPathComponent : rule.replacementFilename)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(rule.isEnabled ? .primary : .secondary)
-                                        .lineLimit(1)
-                                        .truncationMode(.middle)
-                                }
-                                .contentShape(Rectangle())
+                    ForEach(rules) { rule in
+                        Button {
+                            ruleEditor = PatchRuleEditorContext(rule: rule)
+                        } label: {
+                            HStack(spacing: 10) {
+                                ruleRow(rule)
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
                             }
-                            .buttonStyle(.plain)
-                            Spacer(minLength: 4)
-                            Toggle(isOn: $rule.isEnabled) { EmptyView() }
-                                .labelsHidden()
-                                .tint(AppTheme.accent)
-                                .scaleEffect(0.86)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(language.text("patch.edit_rule_hint"))
                     }
                     .onDelete { rules.remove(atOffsets: $0) }
 
@@ -248,7 +240,7 @@ struct PatchProjectEditorView: View {
             validationMessageKey = "patch.error.invalid_project"
             return
         }
-        guard let incompleteRule = rules.first(where: { $0.isEnabled && !$0.hasReplacement }) else {
+        guard let incompleteRule = rules.first(where: { !$0.hasReplacement }) else {
             saveCompleteProject(named: projectName)
             return
         }
@@ -333,18 +325,12 @@ struct PatchRuleEditorView: View {
                         HStack(spacing: 10) {
                             Image(systemName: replacementFilename.isEmpty ? "doc.badge.plus" : "doc.fill")
                                 .foregroundStyle(AppTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(replacementFilename.isEmpty
-                                     ? language.text("patch.choose_file")
-                                     : replacementFilename)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                                Text(language.text(replacementFilename.isEmpty
-                                     ? "patch.replacement_required"
-                                     : "patch.change_replacement"))
-                                    .font(.caption)
-                                    .foregroundStyle(replacementFilename.isEmpty ? Color.orange : Color.secondary)
-                            }
+                            Text(replacementFilename.isEmpty
+                                 ? language.text("patch.choose_file")
+                                 : replacementFilename)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption.weight(.semibold))
@@ -360,15 +346,6 @@ struct PatchRuleEditorView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                    if !replacementFilename.isEmpty {
-                        LabeledContent(
-                            language.text("patch.file_size"),
-                            value: ByteCountFormatter.string(
-                                fromByteCount: Int64(replacementData.count),
-                                countStyle: .file
-                            )
-                        )
                     }
                 }
 

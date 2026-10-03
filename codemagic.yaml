@@ -2,35 +2,25 @@ workflows:
   ios-unsigned:
     name: iOS Unsigned IPA
     instance_type: mac_mini_m2
-    max_build_duration: 60
     environment:
-      xcode: latest
+      xcode: 26.6
+      vars:
+        BUNDLE_ID: com.apple.mobile.MobileHouseArrest
     scripts:
-      - name: Encontrar projeto Xcode
-        script: |
-          set -e
-          PROJECT=$(find . -name "*.xcodeproj" -type d | head -n 1)
-          if [ -z "$PROJECT" ]; then echo "ERRO: nenhum .xcodeproj encontrado."; exit 1; fi
-          echo "PROJECT_PATH=$PROJECT" >> "$CM_ENV"
-      - name: Encontrar scheme
-        script: |
-          set -e
-          SCHEME=$(xcodebuild -project "$PROJECT_PATH" -list | awk '/Schemes:/{getline; gsub(/^[ \t]+|[ \t]+$/, ""); print; exit}')
-          if [ -z "$SCHEME" ]; then echo "ERRO: nenhum scheme encontrado."; exit 1; fi
-          echo "SCHEME_NAME=$SCHEME" >> "$CM_ENV"
       - name: Compilar app sem assinatura
         script: |
           set -e
-          rm -rf "$CM_BUILD_DIR/build"
-          xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME_NAME" -configuration Release -sdk iphoneos -destination "generic/platform=iOS" -derivedDataPath "$CM_BUILD_DIR/build/DerivedData" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
-      - name: Criar IPA unsigned
-        script: |
-          set -e
-          APP_PATH=$(find "$CM_BUILD_DIR/build/DerivedData/Build/Products" -name "*.app" -type d | head -n 1)
-          if [ -z "$APP_PATH" ]; then echo "ERRO: .app não encontrado."; exit 1; fi
-          mkdir -p "$CM_BUILD_DIR/build/ipa/Payload"
-          cp -R "$APP_PATH" "$CM_BUILD_DIR/build/ipa/Payload/"
-          cd "$CM_BUILD_DIR/build/ipa"
-          zip -qry "$CM_BUILD_DIR/build/3105-unsigned.ipa" Payload
+          xcodebuild \
+            -project ThreeOneOSFive.xcodeproj \
+            -scheme 3105 \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            clean build \
+            CONFIGURATION_BUILD_DIR="$CM_BUILD_DIR/build/Release-iphoneos"
     artifacts:
-      - build/3105-unsigned.ipa
+      - $CM_BUILD_DIR/build/Release-iphoneos/3105.app

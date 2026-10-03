@@ -132,7 +132,7 @@ enum PatchTransaction {
             guard bundleID == directory.bundleID else { throw PatchPackageError.invalidProject }
             requestedDirectories.insert(bundleID + "\0" + directory.relativePath)
         }
-        for rule in project.rules where rule.isEnabled {
+        for rule in project.rules {
             let components = try PatchPathValidator.canonicalRelativePath(rule.relativePath)
                 .split(separator: "/").map(String.init)
             guard components.count > 1 else { continue }
@@ -167,7 +167,7 @@ enum PatchTransaction {
             ))
         }
 
-        for rule in project.rules where rule.isEnabled {
+        for rule in project.rules {
             let bundleID = try PatchPathValidator.canonicalBundleIdentifier(rule.bundleID)
             guard bundleID == rule.bundleID else { throw PatchPackageError.invalidProject }
             let root = try resolvedRoot(for: bundleID)

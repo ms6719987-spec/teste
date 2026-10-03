@@ -763,20 +763,31 @@ private struct PatchProjectDetailView: View {
                 } else {
                     Section {
                         ForEach(project.rules) { rule in
-                            Button {
-                                editingRule = rule
-                            } label: {
-                                HStack(spacing: 10) {
-                                    ruleSummary(rule)
-                                    Spacer(minLength: 8)
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.tertiary)
+                            HStack(spacing: 10) {
+                                Button {
+                                    editingRule = rule
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        ruleSummary(rule)
+                                        Spacer(minLength: 4)
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.tertiary)
+                                    }
                                 }
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
+                                .accessibilityHint(language.text("patch.edit_rule_hint"))
+
+                                Toggle(
+                                    "",
+                                    isOn: Binding(
+                                        get: { PatchRuleActivationStore.shared.isEnabled(rule.id) },
+                                        set: { PatchRuleActivationStore.shared.setEnabled($0, for: rule.id) }
+                                    )
+                                )
+                                .labelsHidden()
+                                .tint(AppTheme.accent)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityHint(language.text("patch.edit_rule_hint"))
                         }
                     } header: {
                         Text(language.text("patch.rules"))
@@ -989,9 +1000,12 @@ private struct PatchProjectDetailView: View {
         isWorking = true
         Task.detached(priority: .userInitiated) {
             do {
-                let project = item.summary.schemaVersion >= 2 && item.canInspectContents
+                var project = item.summary.schemaVersion >= 2 && item.canInspectContents
                     ? try PatchProjectLibrary.synchronizeWorkspace(item: item)
                     : baseProject
+                project.rules = project.rules.filter {
+                    PatchRuleActivationStore.shared.isEnabled($0.id)
+                }
                 _ = try DevicePatchService.apply(project: project)
                 await MainActor.run {
                     store.reload()

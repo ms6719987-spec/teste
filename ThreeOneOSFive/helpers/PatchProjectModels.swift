@@ -6,22 +6,19 @@ struct PatchRule: Codable, Identifiable, Hashable {
     var relativePath: String
     var replacementFilename: String
     var replacementData: Data
-    var isEnabled: Bool
 
     init(
         id: UUID = UUID(),
         bundleID: String,
         relativePath: String,
         replacementFilename: String,
-        replacementData: Data,
-        isEnabled: Bool = true
+        replacementData: Data
     ) {
         self.id = id
         self.bundleID = bundleID
         self.relativePath = relativePath
         self.replacementFilename = replacementFilename
         self.replacementData = replacementData
-        self.isEnabled = isEnabled
     }
 
     /// A zero-byte file is a valid replacement; the filename records that the
@@ -344,5 +341,24 @@ enum PatchPathValidator {
             path = "/private" + path
         }
         return URL(fileURLWithPath: path, isDirectory: url.hasDirectoryPath).standardizedFileURL
+    }
+}
+
+final class PatchRuleActivationStore {
+    static let shared = PatchRuleActivationStore()
+    private let defaults = UserDefaults.standard
+    private let key = "patch.rule.activation"
+
+    private init() {}
+
+    func isEnabled(_ ruleID: UUID) -> Bool {
+        guard let values = defaults.dictionary(forKey: key) as? [String: Bool] else { return true }
+        return values[ruleID.uuidString] ?? true
+    }
+
+    func setEnabled(_ enabled: Bool, for ruleID: UUID) {
+        var values = defaults.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        values[ruleID.uuidString] = enabled
+        defaults.set(values, forKey: key)
     }
 }

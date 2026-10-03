@@ -12,6 +12,7 @@ struct ThreeOneOSFiveApp: App {
     @State private var showAttribution = false
     @State private var updateOffer: AppUpdateChecker.Offer?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init() {
         setupLogCapture()
@@ -39,16 +40,6 @@ struct ThreeOneOSFiveApp: App {
                 .environmentObject(repositoryStore)
                 .environment(\.appLanguage, language)
                 .environment(\.locale, language.locale)
-                .displayIdentityAttribution(isPresented: $showAttribution, enabled: true)
-                .sheet(isPresented: $showAttribution) { DisplayAttributionSheet() }
-                .alert(item: $updateOffer) { offer in
-                    Alert(
-                        title: Text(language.text("update.title")),
-                        message: Text(language.text("update.message", offer.version)),
-                        primaryButton: .default(Text(language.text("update.agree"))) { UIApplication.shared.open(offer.url) },
-                        secondaryButton: .cancel(Text(language.text("update.dismiss"))) { AppUpdateChecker.dismiss(version: offer.version) }
-                    )
-                }
                 .onAppear {
                     appState.detectSupport()
                     checkForUpdate()
@@ -57,7 +48,9 @@ struct ThreeOneOSFiveApp: App {
                     guard phase == .active else { return }
                     appState.detectSupport()
                 }
-                .onOpenURL { url in patchDraftCoordinator.presentImport(url) }
+                .onOpenURL { url in
+                    patchDraftCoordinator.presentImport(url)
+                }
         }
     }
 }
