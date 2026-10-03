@@ -38,6 +38,7 @@ struct PatchProjectsView: View {
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
     @State private var showCleaner = false
+    @State private var cleanerAutoClean = false
     @State private var searchText = ""
     @State private var selectedGame: GameOption = .freeFire
     @State private var selectedCategory: PatchCategory = .hs
@@ -192,6 +193,17 @@ struct PatchProjectsView: View {
             }
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showImporter = true
+                    } label: {
+                        Image(systemName: "doc.badge.plus")
+                    }
+                    .tint(AppTheme.accent)
+                    .accessibilityLabel("Importar arquivo")
+                }
+            }
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
                     allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -218,7 +230,7 @@ struct PatchProjectsView: View {
                 }
             }
             .sheet(isPresented: $showCleaner) {
-                CleanerView()
+                CleanerView(autoCleanOnAppear: cleanerAutoClean)
             }
             .sheet(item: $draftCoordinator.request) { request in
                 PatchProjectEditorView(
@@ -323,8 +335,9 @@ struct PatchProjectsView: View {
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
+                        .stroke(AppTheme.accent.opacity(0.42), lineWidth: 0.9)
                 }
+                .transparentBorder(cornerRadius: 11, opacity: 0.10)
                 .overlay(alignment: .topTrailing) {
                     if selectedCategory != .hs {
                         Circle()
@@ -353,8 +366,9 @@ struct PatchProjectsView: View {
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
+                        .stroke(AppTheme.accent.opacity(0.42), lineWidth: 0.9)
                 }
+                .transparentBorder(cornerRadius: 11, opacity: 0.10)
         }
         .buttonStyle(.plain)
     }
@@ -380,6 +394,7 @@ struct PatchProjectsView: View {
 
     private var cleanerRow: some View {
         Button {
+            cleanerAutoClean = true
             showCleaner = true
         } label: {
             HStack(spacing: 12) {
@@ -388,17 +403,20 @@ struct PatchProjectsView: View {
                     Text(language.text("tab.cleaner"))
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text(language.text("repository.cleaner_subtitle"))
+                    Text("Escanear e limpar")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: "sparkles")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(AppTheme.accent)
                     .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .transparentBorder(cornerRadius: 12, opacity: 0.12)
         }
         .buttonStyle(.plain)
     }
@@ -471,20 +489,120 @@ struct PatchProjectsView: View {
 
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem) -> some View {
-        if item.isLocked {
-            Button {
-                store.requestUnlock(for: item)
-            } label: {
-                PatchProjectRow(item: item, language: language)
-            }
-            .buttonStyle(.plain)
+        HStack(spacing: 10) {
+            PatchProjectRow(
+                item: item,
+                language: language
+            )
+            .contentShape(Rectangle())
+
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { DevicePatchService.latestReceipt(projectID: item.id) != nil },
+                    set: { enabled in
+                        if !item.isLocked {
+                            setPatchActive(enabled, for: item)
+                        } else {
+                            store.requestUnlock(for: item)
+                        }
+                    }
+                )
+            )
+            .labelsHidden()
+            .tint(AppTheme.accent)
+            .fixedSize()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .transparentBorder(cornerRadius: 12, opacity: 0.13)
+        .contentShape(Rectangle())
+    }
+
+    private func setPatchActive(_ enabled: Bool, for item: PatchLibraryItem) {
+        guard !item.isLocked, !store.isBusy else { return }
+
+        if enabled {
+            applyPatchFromHome(item)
         } else {
-            NavigationLink {
-                PatchProjectDetailView(store: store, projectID: item.id)
-            } label: {
-                PatchProjectRow(item: item, language: language)
+            restorePatchFromHome(item)
+        }
+    }
+
+    private func applyPatchFromHome(_ item: PatchLibraryItem) {
+        guard let baseProject = item.project else { return }
+        Task.detached(priority: .userInitiated) {
+            do {
+                var project = item.summary.schemaVersion >= 2 && item.canInspectContents
+                    ? try PatchProjectLibrary.synchronizeWorkspace(item: item)
+                    : baseProject
+                _ = try DevicePatchService.apply(project: project)
+                await MainActor.run {
+                    store.reload()
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.done",
+                        messageKey: "patch.applied_message"
+                    )
+                }
+            } catch let error as PatchPackageError {
+                await MainActor.run {
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.failed",
+                        messageKey: privateErrorKey(for: error),
+                        messageArgument: privateErrorArgument(for: error)
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.failed",
+                        messageKey: "patch.error.apply"
+                    )
+                }
             }
-            .buttonStyle(.plain)
+        }
+    }
+
+    private func restorePatchFromHome(_ item: PatchLibraryItem) {
+        guard let receipt = DevicePatchService.latestReceipt(projectID: item.id) else { return }
+        Task.detached(priority: .userInitiated) {
+            do {
+                let inspection = try DevicePatchService.inspectRestore(receipt: receipt)
+                guard inspection.changedTargets.isEmpty else {
+                    await MainActor.run {
+                        store.alert = PatchStoreAlert(
+                            titleKey: "common.failed",
+                            messageKey: "patch.restore_changed_message",
+                            messageArgument: String(inspection.changedTargets.count)
+                        )
+                    }
+                    return
+                }
+                try DevicePatchService.restore(receipt: receipt)
+                await MainActor.run {
+                    store.reload()
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.done",
+                        messageKey: "patch.restored_message"
+                    )
+                }
+            } catch let error as PatchPackageError {
+                await MainActor.run {
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.failed",
+                        messageKey: privateErrorKey(for: error),
+                        messageArgument: privateErrorArgument(for: error)
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    store.alert = PatchStoreAlert(
+                        titleKey: "common.failed",
+                        messageKey: "patch.error.restore"
+                    )
+                }
+            }
         }
     }
 
@@ -544,6 +662,7 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
+
     var body: some View {
         HStack(spacing: 10) {
             AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
@@ -555,6 +674,7 @@ private struct PatchProjectRow: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
+        .transparentBorder(cornerRadius: 10, opacity: 0.10)
     }
 }
 
@@ -779,31 +899,19 @@ private struct PatchProjectDetailView: View {
                 } else {
                     Section {
                         ForEach(project.rules) { rule in
-                            HStack(spacing: 10) {
-                                Button {
-                                    editingRule = rule
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        ruleSummary(rule)
-                                        Spacer(minLength: 4)
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.tertiary)
-                                    }
+                            Button {
+                                editingRule = rule
+                            } label: {
+                                HStack(spacing: 10) {
+                                    ruleSummary(rule)
+                                    Spacer(minLength: 4)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.tertiary)
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityHint(language.text("patch.edit_rule_hint"))
-
-                                Toggle(
-                                    "",
-                                    isOn: Binding(
-                                        get: { PatchRuleActivationStore.shared.isEnabled(rule.id) },
-                                        set: { PatchRuleActivationStore.shared.setEnabled($0, for: rule.id) }
-                                    )
-                                )
-                                .labelsHidden()
-                                .tint(AppTheme.accent)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(language.text("patch.edit_rule_hint"))
                         }
                     } header: {
                         Text(language.text("patch.rules"))

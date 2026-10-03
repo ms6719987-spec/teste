@@ -22,6 +22,17 @@ enum AppTheme {
     static let contentCardCornerRadius: CGFloat = 20
     static let contentCardInset: CGFloat = 16
     static let contentCardPadding: CGFloat = 16
+    static let transparentBorder = Color.white.opacity(0.14)
+}
+
+extension View {
+    func transparentBorder(cornerRadius: CGFloat = 10, opacity: Double = 0.14) -> some View {
+        overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.white.opacity(opacity), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+    }
 }
 
 struct AppCardBorder: View {
@@ -48,6 +59,10 @@ struct AppRowIcon: View {
         ZStack {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(tint.opacity(0.12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.7)
+                }
             Image(systemName: systemName)
                 .font(.system(size: symbolSize, weight: .medium))
                 .foregroundStyle(tint)
@@ -93,6 +108,7 @@ struct AppSearchField: View {
             Color(uiColor: .secondarySystemFill),
             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
+        .transparentBorder(cornerRadius: 10, opacity: 0.16)
         .padding(.horizontal, AppTheme.pageInset)
         .padding(.vertical, 8)
         .background(.bar)
