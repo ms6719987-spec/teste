@@ -18,8 +18,12 @@ private enum GameOption: String {
     case freeFireMax = "Free Fire Max"
 }
 
+private enum GameAssetFilter {
+    static let freeFire = "assetindexer.U6Zffc4YIR3DslNj3cXvYGAqz58~3D"
+    static let freeFireMax = "assetindexer.YJ~2FW7EkU5pRkVg51NrKyx4LXid8~3D"
+}
+
 private enum PatchCategory: String, CaseIterable {
-    case all = "Todos"
     case hs = "HS"
     case aimbot = "AIMBOT"
     case textura = "TEXTURA"
@@ -36,7 +40,7 @@ struct PatchProjectsView: View {
     @State private var showCleaner = false
     @State private var searchText = ""
     @State private var selectedGame: GameOption = .freeFire
-    @State private var selectedCategory: PatchCategory = .all
+    @State private var selectedCategory: PatchCategory = .hs
     @State private var wallpaperPackages: [WallpaperStagedPackage] = []
     @State private var wallpaperImportFeedback: WallpaperImportFeedback?
     @State private var wallpaperPendingDeletion: WallpaperStagedPackage?
@@ -48,17 +52,27 @@ struct PatchProjectsView: View {
 
     private var filteredItems: [PatchLibraryItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return store.items }
+        let requiredAsset = selectedGame == .freeFire
+            ? GameAssetFilter.freeFire
+            : GameAssetFilter.freeFireMax
+
         return store.items.filter { item in
+            guard let project = item.project, item.canInspectContents else { return false }
+
+            // Each game tab only exposes patches containing its corresponding
+            // assetindexer payload. The comparison is exact, as requested.
+            guard project.rules.contains(where: { $0.replacementFilename == requiredAsset }) else {
+                return false
+            }
+
+            guard !query.isEmpty else { return true }
             if item.packageURL.lastPathComponent.localizedCaseInsensitiveContains(query) {
                 return true
             }
-            guard let project = item.project else { return false }
             if project.name.localizedCaseInsensitiveContains(query)
                 || project.author.localizedCaseInsensitiveContains(query) {
                 return true
             }
-            guard item.canInspectContents else { return false }
             return project.allBundleIdentifiers.contains {
                     $0.localizedCaseInsensitiveContains(query)
                 }
@@ -312,7 +326,7 @@ struct PatchProjectsView: View {
                         .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
                 }
                 .overlay(alignment: .topTrailing) {
-                    if selectedCategory != .all {
+                    if selectedCategory != .hs {
                         Circle()
                             .fill(AppTheme.accent)
                             .frame(width: 7, height: 7)
@@ -465,16 +479,12 @@ struct PatchProjectsView: View {
             }
             .buttonStyle(.plain)
         } else {
-            HStack(spacing: 10) {
-                NavigationLink {
-                    PatchProjectDetailView(store: store, projectID: item.id)
-                } label: {
-                    PatchProjectRow(item: item, language: language)
-                }
-                .buttonStyle(.plain)
-
-                PatchActivationToggle(item: item)
+            NavigationLink {
+                PatchProjectDetailView(store: store, projectID: item.id)
+            } label: {
+                PatchProjectRow(item: item, language: language)
             }
+            .buttonStyle(.plain)
         }
     }
 
@@ -545,34 +555,6 @@ private struct PatchProjectRow: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
-    }
-}
-
-private struct PatchActivationToggle: View {
-    let item: PatchLibraryItem
-    @State private var isEnabled: Bool
-
-    init(item: PatchLibraryItem) {
-        self.item = item
-        let rules = item.project?.rules ?? []
-        _isEnabled = State(
-            initialValue: rules.isEmpty || rules.allSatisfy {
-                PatchRuleActivationStore.shared.isEnabled($0.id)
-            }
-        )
-    }
-
-    var body: some View {
-        Toggle("", isOn: $isEnabled)
-            .labelsHidden()
-            .tint(AppTheme.accent)
-            .accessibilityLabel(Text(item.project?.name ?? "Patch"))
-            .onChange(of: isEnabled) { enabled in
-                guard let rules = item.project?.rules else { return }
-                for rule in rules {
-                    PatchRuleActivationStore.shared.setEnabled(enabled, for: rule.id)
-                }
-            }
     }
 }
 
