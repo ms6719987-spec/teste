@@ -9,8 +9,6 @@ struct PatchProjectEditorView: View {
     let onSave: (PatchProject, String?) -> Void
 
     @State private var name: String
-    @State private var author: String
-    @State private var isPrivate: Bool
     @State private var bundleID: String
     @State private var bundleIdentifiers: [String]
     @State private var directories: [PatchDirectory]
@@ -30,8 +28,6 @@ struct PatchProjectEditorView: View {
         self.initialDraft = initialDraft
         self.onSave = onSave
         _name = State(initialValue: existingProject?.name ?? initialDraft?.name ?? "")
-        _author = State(initialValue: existingProject?.author ?? "")
-        _isPrivate = State(initialValue: existingProject?.isPrivate ?? false)
         _bundleID = State(initialValue: initialDraft?.bundleIdentifiers.first ?? "")
         _bundleIdentifiers = State(
             initialValue: existingProject?.bundleIdentifiers
@@ -50,9 +46,6 @@ struct PatchProjectEditorView: View {
                 Section(language.text("patch.project")) {
                     TextField(language.text("patch.project_name"), text: $name)
                         .textInputAutocapitalization(.words)
-                    TextField(language.text("patch.author_optional"), text: $author)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
                 }
 
                 if existingProject == nil {
@@ -134,22 +127,6 @@ struct PatchProjectEditorView: View {
                         : "patch.password_existing_footer"))
                 }
 
-                Section {
-                    Toggle(isOn: $isPrivate) {
-                        Label(
-                            language.text("patch.private"),
-                            systemImage: "eye.slash.fill"
-                        )
-                    }
-                    .disabled(existingProject != nil)
-                } header: {
-                    Text(language.text("patch.privacy"))
-                } footer: {
-                    Text(language.text(existingProject == nil
-                        ? "patch.private_footer"
-                        : "patch.private_existing_footer"))
-                }
-
                 if let validationMessageKey {
                     Section {
                         Label(language.text(validationMessageKey), systemImage: "exclamationmark.triangle.fill")
@@ -203,21 +180,8 @@ struct PatchProjectEditorView: View {
 
     private func save() {
         let projectName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let projectAuthor = author.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !projectName.isEmpty, projectName.utf8.count <= 120 else {
             validationMessageKey = "patch.error.invalid_project"
-            return
-        }
-        guard projectAuthor.utf8.count <= PatchPackageLimits.maximumAuthorBytes,
-              !projectAuthor.unicodeScalars.contains(
-                where: CharacterSet.controlCharacters.contains
-              ) else {
-            validationMessageKey = "patch.error.invalid_author"
-            return
-        }
-        author = projectAuthor
-        if existingProject == nil, isPrivate, password.isEmpty {
-            validationMessageKey = "patch.error.private_password"
             return
         }
         if existingProject == nil, initialDraft == nil {
@@ -252,8 +216,6 @@ struct PatchProjectEditorView: View {
         let project = PatchProject(
             id: existingProject?.id ?? UUID(),
             name: projectName,
-            author: author,
-            isPrivate: isPrivate,
             createdAt: existingProject?.createdAt ?? Date(),
             updatedAt: Date(),
             bundleIdentifiers: bundleIdentifiers,
@@ -322,27 +284,45 @@ struct PatchRuleEditorView: View {
                     Button {
                         showFileImporter = true
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             Image(systemName: replacementFilename.isEmpty ? "doc.badge.plus" : "doc.fill")
                                 .foregroundStyle(AppTheme.accent)
-                            Text(replacementFilename.isEmpty
-                                 ? language.text("patch.choose_file")
-                                 : replacementFilename)
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer(minLength: 0)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(replacementFilename.isEmpty
+                                     ? language.text("patch.choose_file")
+                                     : replacementFilename)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Text(language.text(replacementFilename.isEmpty
+                                     ? "patch.replacement_required"
+                                     : "patch.change_replacement"))
+                                    .font(.caption)
+                                    .foregroundStyle(replacementFilename.isEmpty ? Color.orange : Color.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
                         }
                         .contentShape(Rectangle())
                     }
                     .disabled(isImporting)
                     if isImporting {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             ProgressView()
                             Text(language.text("patch.importing_replacement"))
-                                .font(.caption)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                    if !replacementFilename.isEmpty {
+                        LabeledContent(
+                            language.text("patch.file_size"),
+                            value: ByteCountFormatter.string(
+                                fromByteCount: Int64(replacementData.count),
+                                countStyle: .file
+                            )
+                        )
                     }
                 }
 
