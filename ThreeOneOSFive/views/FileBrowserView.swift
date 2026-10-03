@@ -35,6 +35,7 @@ struct FileBrowserView: View {
     @State private var transferSession: FileTransferSession?
     @State private var transferConflict: FileTransferConflict?
     @State private var deleteTargets: [FileEntry] = []
+    @State private var inactiveFilePaths = Set<String>()
     @AppStorage(FileBrowserSortOrder.storageKey)
     private var sortOrderRaw = FileBrowserSortOrder.nameAscending.rawValue
 
@@ -229,7 +230,10 @@ struct FileBrowserView: View {
         }
         .animation(interfaceAnimation, value: isSelecting)
         .animation(interfaceAnimation, value: fileOperationCoordinator.payload)
-        .onAppear { load() }
+        .onAppear {
+            loadInactiveFilePaths()
+            load()
+        }
         .sheet(item: $replacementRequest) { request in
             FileDocumentPicker(
                 allowsMultipleSelection: false,
@@ -397,34 +401,88 @@ struct FileBrowserView: View {
                 FileEntryRow(
                     entry: entry,
                     language: language,
-                    selectionState: selectedEntryIDs.contains(entry.id)
+                    selectionState: selectedEntryIDs.contains(entry.id),
+                    isActive: isFileActive(entry)
                 )
             }
             .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
-        } else if entry.isDirectory {
-            NavigationLink(
-                value: FileBrowserDestination(
-                    containerPath: containerPath,
-                    startPath: entry.path,
-                    title: entry.name,
-                    bundleID: bundleID
-                )
-            ) {
-                FileEntryRow(entry: entry, language: language, selectionState: nil)
-            }
-            .contextMenu { fileActions(for: entry) }
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
         } else {
-            NavigationLink {
-                FileQuickLookView(file: entry)
-            } label: {
-                FileEntryRow(entry: entry, language: language, selectionState: nil)
+            HStack(spacing: 10) {
+                if entry.isDirectory {
+                    NavigationLink(
+                        value: FileBrowserDestination(
+                            containerPath: containerPath,
+                            startPath: entry.path,
+                            title: entry.name,
+                            bundleID: bundleID
+                        )
+                    ) {
+                        FileEntryRow(entry: entry, language: language, selectionState: nil, isActive: true)
+                    }
+                    .contextMenu { fileActions(for: entry) }
+                } else {
+                    NavigationLink {
+                        FileQuickLookView(file: entry)
+                    } label: {
+                        FileEntryRow(
+                            entry: entry,
+                            language: language,
+                            selectionState: nil,
+                            isActive: isFileActive(entry)
+                        )
+                    }
+                    .disabled(!isFileActive(entry))
+                    .contextMenu { fileActions(for: entry) }
+                    .accessibilityHint(language.text("browser.file_actions_hint"))
+
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { isFileActive(entry) },
+                            set: { setFileActive($0, for: entry) }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .accessibilityLabel(
+                        Text(
+                            isFileActive(entry)
+                                ? language.text("browser.deactivate_file")
+                                : language.text("browser.activate_file")
+                        )
+                    )
+                }
             }
-            .contextMenu { fileActions(for: entry) }
-            .accessibilityHint(language.text("browser.file_actions_hint"))
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
         }
+    }
+
+    private func isFileActive(_ entry: FileEntry) -> Bool {
+        entry.isDirectory || !inactiveFilePaths.contains(entry.path)
+    }
+
+    private func setFileActive(_ active: Bool, for entry: FileEntry) {
+        guard !entry.isDirectory else { return }
+        if active {
+            inactiveFilePaths.remove(entry.path)
+        } else {
+            inactiveFilePaths.insert(entry.path)
+        }
+        saveInactiveFilePaths()
+    }
+
+    private func loadInactiveFilePaths() {
+        inactiveFilePaths = Set(
+            UserDefaults.standard.stringArray(forKey: "filebrowser.inactive.paths") ?? []
+        )
+    }
+
+    private func saveInactiveFilePaths() {
+        UserDefaults.standard.set(
+            Array(inactiveFilePaths),
+            forKey: "filebrowser.inactive.paths"
+        )
     }
 
     @ViewBuilder
@@ -1476,6 +1534,7 @@ private struct FileEntryRow: View {
     let entry: FileEntry
     let language: AppLanguage
     let selectionState: Bool?
+    let isActive: Bool
 
     private var fileExtension: String {
         (entry.name as NSString).pathExtension.lowercased()
@@ -1496,40 +1555,8 @@ private struct FileEntryRow: View {
     }
 
     private var tint: Color {
-        if entry.isDirectory { return .blue }
-        if ["jpg", "jpeg", "png", "gif", "heic", "webp"].contains(fileExtension) {
-            return .purple
-        }
-        return AppTheme.accent
-    }
-
-    private var detailText: String {
-        var components: [String] = []
-        if entry.isDirectory {
-            switch entry.size {
-            case -1:
-                components.append(language.text("browser.calculating_size"))
-            case -2:
-                components.append(language.text("browser.size_unavailable"))
-            default:
-                components.append(entry.sizeText)
-            }
-            if let childCount = entry.childCount {
-                components.append(language.text("browser.children_count", Int64(childCount)))
-            }
-        } else {
-            components.append(entry.sizeText)
-        }
-        if let modifiedAt = entry.modifiedAt {
-            components.append(
-                DateFormatter.localizedString(
-                    from: modifiedAt,
-                    dateStyle: .short,
-                    timeStyle: .short
-                )
-            )
-        }
-        return components.joined(separator: " · ")
+        // Keep file/folder icons within the unified green interface.
+        AppTheme.accent
     }
 
     var body: some View {
@@ -1541,17 +1568,11 @@ private struct FileEntryRow: View {
                 frameSize: AppTheme.fileRowIconFrame
             )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(entry.name)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                    .truncationMode(.middle)
-                Text(detailText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
+            Text(entry.name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .truncationMode(.middle)
+                .foregroundStyle(isActive ? .primary : .secondary)
 
             Spacer(minLength: 4)
 
@@ -1562,6 +1583,7 @@ private struct FileEntryRow: View {
                     .accessibilityHidden(true)
             }
         }
+        .opacity(isActive ? 1 : 0.48)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }

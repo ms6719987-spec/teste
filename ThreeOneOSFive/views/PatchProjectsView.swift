@@ -23,8 +23,6 @@ struct PatchProjectsView: View {
     @State private var showWallpaperImporter = false
     @State private var showCleaner = false
     @State private var searchText = ""
-    @State private var showFeatureOptions = false
-    @State private var enabledFeatures: Set<String> = []
     @State private var wallpaperPackages: [WallpaperStagedPackage] = []
     @State private var wallpaperImportFeedback: WallpaperImportFeedback?
     @State private var wallpaperPendingDeletion: WallpaperStagedPackage?
@@ -97,37 +95,6 @@ struct PatchProjectsView: View {
                     prompt: language.text("installed.search"),
                     clearLabel: language.text("common.clear")
                 )
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showFeatureOptions.toggle()
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "slider.horizontal.3")
-                        Text("Opções")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Image(systemName: showFeatureOptions ? "chevron.up" : "chevron.down")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
-
-                if showFeatureOptions {
-                    HStack(spacing: 8) {
-                        featureButton("HS")
-                        featureButton("AIMBOT")
-                        featureButton("TEXTURA")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
                 Divider()
                 List {
                     if !hasLocalContent && (store.isBusy || isImportingWallpapers) {
@@ -153,10 +120,34 @@ struct PatchProjectsView: View {
                         if !filteredWallpaperPackages.isEmpty {
                             Section(language.text("tab.wallpapers")) {
                                 ForEach(filteredWallpaperPackages) { package in
-                                    wallpaperRow(package)
-                                        .listRowSeparator(.visible)
+                                    NavigationLink {
+                                        InstalledWallpaperPackageDetailView(
+                                            package: package,
+                                            onApplied: reloadWallpaperPackages
+                                        )
+                                    } label: {
+                                        wallpaperRow(package)
+                                    }
+                                    .swipeActions(
+                                        edge: .trailing,
+                                        allowsFullSwipe: false
+                                    ) {
+                                        Button(role: .destructive) {
+                                            wallpaperPendingDeletion = package
+                                        } label: {
+                                            Label(
+                                                language.text("common.delete"),
+                                                systemImage: "trash"
+                                            )
+                                        }
+                                    }
                                 }
                             }
+                        }
+                    }
+                    if cleanerEnabled {
+                        Section(language.text("repository.utilities")) {
+                            cleanerRow
                         }
                     }
                 }
@@ -164,6 +155,43 @@ struct PatchProjectsView: View {
             }
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            showCreate = true
+                        } label: {
+                            Label(language.text("patch.new"), systemImage: "doc.badge.plus")
+                        }
+                        Button {
+                            showImporter = true
+                        } label: {
+                            Label(language.text("patch.import"), systemImage: "square.and.arrow.down")
+                        }
+                        Button {
+                            showWallpaperImporter = true
+                        } label: {
+                            Label(
+                                language.text("wallpaper.import"),
+                                systemImage: "photo.badge.plus"
+                            )
+                        }
+                    } label: {
+                        if store.isBusy || isImportingWallpapers {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "plus")
+                        }
+                    }
+                    .disabled(store.isBusy || isImportingWallpapers)
+                    .accessibilityLabel(language.text("patch.add"))
+                }
+                AppUtilityToolbar(
+                    language: language,
+                    onOpenSettings: onOpenSettings,
+                    onOpenLogs: onOpenLogs
+                )
+            }
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
                     allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -269,30 +297,6 @@ struct PatchProjectsView: View {
         }
     }
 
-    private func featureButton(_ name: String) -> some View {
-        let isEnabled = enabledFeatures.contains(name)
-        return Button {
-            if isEnabled {
-                enabledFeatures.remove(name)
-            } else {
-                enabledFeatures.insert(name)
-            }
-        } label: {
-            Text(name)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isEnabled ? Color.white : Color.primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
-                .background(
-                    isEnabled ? AppTheme.accent : Color.secondary.opacity(0.12),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(name)
-        .accessibilityValue(isEnabled ? "Ativado" : "Desativado")
-    }
-
     private func consumeExternalImport() {
         guard let request = draftCoordinator.importRequest else { return }
         draftCoordinator.clearImport()
@@ -300,16 +304,27 @@ struct PatchProjectsView: View {
     }
 
     private func wallpaperRow(_ package: WallpaperStagedPackage) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             AppRowIcon(systemName: wallpaperSymbol)
-            Text(package.displayName)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(package.displayName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                InstalledContentKindBadge(kind: .wallpaper, language: language)
+                Text(language.text(
+                    "wallpaper.package_summary",
+                    Int64(package.payload.descriptors.count),
+                    ByteCountFormatter.string(
+                        fromByteCount: package.payload.totalBytes,
+                        countStyle: .file
+                    )
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
-        .padding(.vertical, 1)
-        .contentShape(Rectangle())
+        .padding(.vertical, 4)
     }
 
     private var cleanerRow: some View {
@@ -405,17 +420,18 @@ struct PatchProjectsView: View {
 
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem) -> some View {
-        HStack(spacing: 10) {
-            AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
-            Text(item.project?.name ?? item.packageURL.lastPathComponent)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
+        if item.isLocked {
+            Button { store.requestUnlock(for: item) } label: {
+                PatchProjectRow(item: item, language: language)
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink {
+                PatchProjectDetailView(store: store, projectID: item.id)
+            } label: {
+                PatchProjectRow(item: item, language: language)
+            }
         }
-        .padding(.vertical, 1)
-        .contentShape(Rectangle())
-        .allowsHitTesting(false)
     }
 
     private var emptyState: some View {

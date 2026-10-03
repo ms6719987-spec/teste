@@ -411,6 +411,8 @@
 "browser.delete_title" = "Delete this item?";
 "browser.delete_message" = "“%@” and its contents will be permanently deleted.";
 "browser.file_actions_hint" = "Touch and hold for file actions.";
+"browser.activate_file" = "Activate file";
+"browser.deactivate_file" = "Deactivate file";
 "browser.creating" = "Creating…";
 "browser.renaming" = "Renaming…";
 "browser.deleting" = "Deleting…";

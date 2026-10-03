@@ -411,6 +411,8 @@
 "browser.delete_title" = "Xóa mục này?";
 "browser.delete_message" = "“%@” và toàn bộ nội dung bên trong sẽ bị xóa vĩnh viễn.";
 "browser.file_actions_hint" = "Chạm và giữ để mở thao tác tệp.";
+"browser.activate_file" = "Bật tệp";
+"browser.deactivate_file" = "Tắt tệp";
 "browser.creating" = "Đang tạo…";
 "browser.renaming" = "Đang đổi tên…";
 "browser.deleting" = "Đang xóa…";

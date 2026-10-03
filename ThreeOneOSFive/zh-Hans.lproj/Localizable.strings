@@ -411,6 +411,8 @@
 "browser.delete_title" = "要删除此项目吗？";
 "browser.delete_message" = "“%@”及其内容将被永久删除。";
 "browser.file_actions_hint" = "触摸并按住以显示文件操作。";
+"browser.activate_file" = "启用文件";
+"browser.deactivate_file" = "停用文件";
 "browser.creating" = "正在创建…";
 "browser.renaming" = "正在重命名…";
 "browser.deleting" = "正在删除…";
