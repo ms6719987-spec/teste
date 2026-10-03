@@ -6,19 +6,22 @@ struct PatchRule: Codable, Identifiable, Hashable {
     var relativePath: String
     var replacementFilename: String
     var replacementData: Data
+    var isEnabled: Bool
 
     init(
         id: UUID = UUID(),
         bundleID: String,
         relativePath: String,
         replacementFilename: String,
-        replacementData: Data
+        replacementData: Data,
+        isEnabled: Bool = true
     ) {
         self.id = id
         self.bundleID = bundleID
         self.relativePath = relativePath
         self.replacementFilename = replacementFilename
         self.replacementData = replacementData
+        self.isEnabled = isEnabled
     }
 
     /// A zero-byte file is a valid replacement; the filename records that the

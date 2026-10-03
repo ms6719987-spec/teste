@@ -401,7 +401,7 @@ struct FileBrowserView: View {
                 )
             }
             .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         } else if entry.isDirectory {
             NavigationLink(
                 value: FileBrowserDestination(
@@ -414,15 +414,16 @@ struct FileBrowserView: View {
                 FileEntryRow(entry: entry, language: language, selectionState: nil)
             }
             .contextMenu { fileActions(for: entry) }
-            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         } else {
-            FileActivationRow(
-                entry: entry,
-                language: language,
-                onOpen: { FileQuickLookView(file: entry) }
-            )
+            NavigationLink {
+                FileQuickLookView(file: entry)
+            } label: {
+                FileEntryRow(entry: entry, language: language, selectionState: nil)
+            }
             .contextMenu { fileActions(for: entry) }
-            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
+            .accessibilityHint(language.text("browser.file_actions_hint"))
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         }
     }
 
@@ -1470,20 +1471,6 @@ struct FileDocumentPicker: UIViewControllerRepresentable {
     }
 }
 
-private enum ImportedFileActivationStore {
-    private static let prefix = "threeoneosfive.file-enabled."
-
-    static func isEnabled(path: String) -> Bool {
-        let key = prefix + path
-        guard UserDefaults.standard.object(forKey: key) != nil else { return true }
-        return UserDefaults.standard.bool(forKey: key)
-    }
-
-    static func setEnabled(_ enabled: Bool, path: String) {
-        UserDefaults.standard.set(enabled, forKey: prefix + path)
-    }
-}
-
 private struct FileEntryRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let entry: FileEntry
@@ -1508,21 +1495,65 @@ private struct FileEntryRow: View {
         return "doc.fill"
     }
 
+    private var tint: Color {
+        if entry.isDirectory { return .blue }
+        if ["jpg", "jpeg", "png", "gif", "heic", "webp"].contains(fileExtension) {
+            return .purple
+        }
+        return AppTheme.accent
+    }
+
+    private var detailText: String {
+        var components: [String] = []
+        if entry.isDirectory {
+            switch entry.size {
+            case -1:
+                components.append(language.text("browser.calculating_size"))
+            case -2:
+                components.append(language.text("browser.size_unavailable"))
+            default:
+                components.append(entry.sizeText)
+            }
+            if let childCount = entry.childCount {
+                components.append(language.text("browser.children_count", Int64(childCount)))
+            }
+        } else {
+            components.append(entry.sizeText)
+        }
+        if let modifiedAt = entry.modifiedAt {
+            components.append(
+                DateFormatter.localizedString(
+                    from: modifiedAt,
+                    dateStyle: .short,
+                    timeStyle: .short
+                )
+            )
+        }
+        return components.joined(separator: " · ")
+    }
+
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 11) {
             AppRowIcon(
                 systemName: symbol,
-                tint: AppTheme.accent,
+                tint: tint,
                 symbolSize: AppTheme.fileRowIconSize,
-                frameSize: 28
+                frameSize: AppTheme.fileRowIconFrame
             )
 
-            Text(entry.name)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                .truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                    .truncationMode(.middle)
+                Text(detailText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
 
-            Spacer(minLength: 2)
+            Spacer(minLength: 4)
 
             if let selectionState {
                 Image(systemName: selectionState ? "checkmark.circle.fill" : "circle")
@@ -1533,48 +1564,6 @@ private struct FileEntryRow: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct FileActivationRow<Destination: View>: View {
-    let entry: FileEntry
-    let language: AppLanguage
-    let onOpen: () -> Destination
-    @State private var isEnabled: Bool
-
-    init(
-        entry: FileEntry,
-        language: AppLanguage,
-        @ViewBuilder onOpen: @escaping () -> Destination
-    ) {
-        self.entry = entry
-        self.language = language
-        self.onOpen = onOpen
-        _isEnabled = State(initialValue: ImportedFileActivationStore.isEnabled(path: entry.path))
-    }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            NavigationLink {
-                onOpen()
-            } label: {
-                FileEntryRow(entry: entry, language: language, selectionState: nil)
-                    .opacity(isEnabled ? 1 : 0.45)
-            }
-            .disabled(!isEnabled)
-
-            Toggle("", isOn: Binding(
-                get: { isEnabled },
-                set: { newValue in
-                    isEnabled = newValue
-                    ImportedFileActivationStore.setEnabled(newValue, path: entry.path)
-                }
-            ))
-            .labelsHidden()
-            .tint(AppTheme.accent)
-            .frame(width: 52)
-            .accessibilityLabel(isEnabled ? "Arquivo ativado" : "Arquivo desativado")
-        }
     }
 }
 

@@ -1,13 +1,7 @@
 import SwiftUI
 
 enum AppTheme {
-    static let accent = Color(
-        uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 1.00)
-                : UIColor(red: 0.12, green: 0.62, blue: 0.25, alpha: 1.00)
-        }
-    )
+    static let accent = Color(uiColor: .systemGreen)
     static let pageBackground = Color(uiColor: .systemBackground)
     static let consoleBackground = Color(uiColor: .secondarySystemBackground)
     static let pageInset: CGFloat = 16
@@ -15,7 +9,7 @@ enum AppTheme {
     static let rowIconFrame: CGFloat = 28
     static let fileRowIconSize: CGFloat = 17
     static let fileRowIconFrame: CGFloat = 30
-    static let fileRowHeight: CGFloat = 46
+    static let fileRowHeight: CGFloat = 60
     static let appIconSize: CGFloat = 32
     static let emptyIconSize: CGFloat = 30
     static let selectionIconSize: CGFloat = 18
