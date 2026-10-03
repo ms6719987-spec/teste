@@ -4,8 +4,8 @@ enum AppTheme {
     static let accent = Color(
         uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.18, green: 0.88, blue: 0.46, alpha: 1.00)
-                : UIColor(red: 0.06, green: 0.58, blue: 0.28, alpha: 1.00)
+                ? UIColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 1.00)
+                : UIColor(red: 0.12, green: 0.62, blue: 0.25, alpha: 1.00)
         }
     )
     static let pageBackground = Color(uiColor: .systemBackground)
@@ -15,51 +15,26 @@ enum AppTheme {
     static let rowIconFrame: CGFloat = 28
     static let fileRowIconSize: CGFloat = 17
     static let fileRowIconFrame: CGFloat = 30
-    static let fileRowHeight: CGFloat = 48
+    static let fileRowHeight: CGFloat = 46
     static let appIconSize: CGFloat = 32
     static let emptyIconSize: CGFloat = 30
     static let selectionIconSize: CGFloat = 18
+    static let contentCardCornerRadius: CGFloat = 20
+    static let contentCardInset: CGFloat = 16
+    static let contentCardPadding: CGFloat = 16
 }
 
-
-
-final class FileActivationStore: ObservableObject {
-    static let shared = FileActivationStore()
-
-    private static let prefix = "3105.file.activation."
-    @Published private(set) var states: [String: Bool] = [:]
-
-    private init() {}
-
-    func isEnabled(path: String) -> Bool {
-        states[path] ?? (UserDefaults.standard.object(forKey: Self.prefix + path) as? Bool ?? true)
-    }
-
-    func setEnabled(_ enabled: Bool, path: String) {
-        states[path] = enabled
-        UserDefaults.standard.set(enabled, forKey: Self.prefix + path)
-    }
-}
-
-struct CompactFileToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Button {
-            configuration.isOn.toggle()
-        } label: {
-            Capsule(style: .continuous)
-                .fill(configuration.isOn ? AppTheme.accent : Color(uiColor: .tertiarySystemFill))
-                .frame(width: 42, height: 24)
-                .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 20, height: 20)
-                        .padding(2)
-                        .shadow(color: .black.opacity(0.12), radius: 1, y: 1)
-                }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(configuration.isOn ? "Disable file" : "Enable file")
-        .accessibilityValue(configuration.isOn ? "On" : "Off")
+struct AppCardBorder: View {
+    var body: some View {
+        RoundedRectangle(
+            cornerRadius: AppTheme.contentCardCornerRadius,
+            style: .continuous
+        )
+        .strokeBorder(
+            Color(uiColor: .separator).opacity(0.22),
+            lineWidth: 0.5
+        )
+        .accessibilityHidden(true)
     }
 }
 

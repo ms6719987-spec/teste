@@ -35,11 +35,22 @@ struct FileBrowserView: View {
     @State private var transferSession: FileTransferSession?
     @State private var transferConflict: FileTransferConflict?
     @State private var deleteTargets: [FileEntry] = []
+    @AppStorage(FileBrowserSortOrder.storageKey)
+    private var sortOrderRaw = FileBrowserSortOrder.nameAscending.rawValue
 
     private var filteredEntries: [FileEntry] {
         let query = fileSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return entries }
-        return entries.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        let filtered = query.isEmpty
+            ? entries
+            : entries.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        return FileBrowserSortPolicy.sorted(
+            filtered,
+            order: sortOrder,
+            name: \.name,
+            isDirectory: \.isDirectory,
+            size: \.size,
+            modifiedAt: \.modifiedAt
+        )
     }
 
     private var selectedEntries: [FileEntry] {
@@ -128,6 +139,9 @@ struct FileBrowserView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     FilesTabToolbarButton(session: filesTabSession)
                 }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                sortMenu
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(isSelecting
@@ -353,6 +367,27 @@ struct FileBrowserView: View {
         }
     }
 
+    private var sortOrder: FileBrowserSortOrder {
+        FileBrowserSortOrder(rawValue: sortOrderRaw) ?? .nameAscending
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker(language.text("browser.sort"), selection: $sortOrderRaw) {
+                ForEach(FileBrowserSortOrder.allCases) { order in
+                    Label(
+                        language.text(order.localizationKey),
+                        systemImage: order.systemImage
+                    )
+                    .tag(order.rawValue)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel(language.text("browser.sort"))
+    }
+
     @ViewBuilder
     private func fileRow(_ entry: FileEntry) -> some View {
         if isSelecting {
@@ -366,7 +401,7 @@ struct FileBrowserView: View {
                 )
             }
             .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
         } else if entry.isDirectory {
             NavigationLink(
                 value: FileBrowserDestination(
@@ -379,12 +414,15 @@ struct FileBrowserView: View {
                 FileEntryRow(entry: entry, language: language, selectionState: nil)
             }
             .contextMenu { fileActions(for: entry) }
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
         } else {
-            ActiveFileRow(entry: entry, language: language)
-                .contextMenu { fileActions(for: entry) }
-                .accessibilityHint(language.text("browser.file_actions_hint"))
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
+            FileActivationRow(
+                entry: entry,
+                language: language,
+                onOpen: { FileQuickLookView(file: entry) }
+            )
+            .contextMenu { fileActions(for: entry) }
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
         }
     }
 
@@ -1158,6 +1196,17 @@ struct FileBrowserView: View {
                 selectedEntryIDs.formIntersection(Set(loadedEntries.map(\.id)))
                 isLoadingEntries = false
             }
+            for directory in loadedEntries where directory.isDirectory {
+                let summary = try? FileBrowserMetadataScanner.directorySummary(
+                    at: URL(fileURLWithPath: directory.path, isDirectory: true)
+                )
+                DispatchQueue.main.async {
+                    guard currentPath == path,
+                          let index = entries.firstIndex(where: { $0.id == directory.id })
+                    else { return }
+                    entries[index] = directory.withDirectorySummary(summary)
+                }
+            }
         }
     }
 
@@ -1421,12 +1470,25 @@ struct FileDocumentPicker: UIViewControllerRepresentable {
     }
 }
 
+private enum ImportedFileActivationStore {
+    private static let prefix = "threeoneosfive.file-enabled."
+
+    static func isEnabled(path: String) -> Bool {
+        let key = prefix + path
+        guard UserDefaults.standard.object(forKey: key) != nil else { return true }
+        return UserDefaults.standard.bool(forKey: key)
+    }
+
+    static func setEnabled(_ enabled: Bool, path: String) {
+        UserDefaults.standard.set(enabled, forKey: prefix + path)
+    }
+}
+
 private struct FileEntryRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let entry: FileEntry
     let language: AppLanguage
     let selectionState: Bool?
-    @ObservedObject private var activationStore = FileActivationStore.shared
 
     private var fileExtension: String {
         (entry.name as NSString).pathExtension.lowercased()
@@ -1452,64 +1514,67 @@ private struct FileEntryRow: View {
                 systemName: symbol,
                 tint: AppTheme.accent,
                 symbolSize: AppTheme.fileRowIconSize,
-                frameSize: AppTheme.fileRowIconFrame
+                frameSize: 28
             )
 
             Text(entry.name)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(entry.isDirectory || activationStore.isEnabled(path: entry.path) ? .primary : .secondary)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                 .truncationMode(.middle)
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 2)
 
-            if entry.isDirectory {
-                EmptyView()
-            } else if let selectionState {
+            if let selectionState {
                 Image(systemName: selectionState ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: AppTheme.selectionIconSize, weight: .medium))
                     .foregroundStyle(selectionState ? AppTheme.accent : Color.secondary)
                     .accessibilityHidden(true)
             }
         }
-        .opacity(entry.isDirectory || activationStore.isEnabled(path: entry.path) ? 1 : 0.52)
-        .frame(minHeight: AppTheme.fileRowHeight)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 }
 
-private struct ActiveFileRow: View {
+private struct FileActivationRow<Destination: View>: View {
     let entry: FileEntry
     let language: AppLanguage
-    @ObservedObject private var activationStore = FileActivationStore.shared
+    let onOpen: () -> Destination
+    @State private var isEnabled: Bool
+
+    init(
+        entry: FileEntry,
+        language: AppLanguage,
+        @ViewBuilder onOpen: @escaping () -> Destination
+    ) {
+        self.entry = entry
+        self.language = language
+        self.onOpen = onOpen
+        _isEnabled = State(initialValue: ImportedFileActivationStore.isEnabled(path: entry.path))
+    }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             NavigationLink {
-                FileQuickLookView(file: entry)
+                onOpen()
             } label: {
                 FileEntryRow(entry: entry, language: language, selectionState: nil)
+                    .opacity(isEnabled ? 1 : 0.45)
             }
-            .disabled(!activationStore.isEnabled(path: entry.path))
-            .buttonStyle(.plain)
+            .disabled(!isEnabled)
 
-            FileActivationToggle(path: entry.path)
+            Toggle("", isOn: Binding(
+                get: { isEnabled },
+                set: { newValue in
+                    isEnabled = newValue
+                    ImportedFileActivationStore.setEnabled(newValue, path: entry.path)
+                }
+            ))
+            .labelsHidden()
+            .tint(AppTheme.accent)
+            .frame(width: 52)
+            .accessibilityLabel(isEnabled ? "Arquivo ativado" : "Arquivo desativado")
         }
-    }
-}
-
-private struct FileActivationToggle: View {
-    let path: String
-    @ObservedObject private var activationStore = FileActivationStore.shared
-
-    var body: some View {
-        Toggle("", isOn: Binding(
-            get: { activationStore.isEnabled(path: path) },
-            set: { activationStore.setEnabled($0, path: path) }
-        ))
-        .labelsHidden()
-        .toggleStyle(CompactFileToggleStyle())
     }
 }
 
