@@ -98,8 +98,6 @@ struct PatchProjectsView: View {
                     clearLabel: language.text("common.clear")
                 )
 
-                supportedVersionsCard
-
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showFeatureOptions.toggle()
@@ -269,59 +267,6 @@ struct PatchProjectsView: View {
                 consumeExternalImport()
             }
         }
-    }
-
-
-    private var supportedVersionsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.shield.fill")
-                    .foregroundStyle(AppTheme.accent)
-                Text("Versões suportadas")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                versionBadge("iOS 17", detail: "17.0–17.7.x")
-                versionBadge("iOS 18", detail: "18.0–18.7.1")
-            }
-
-            HStack(spacing: 8) {
-                versionBadge("iOS 26", detail: "26.0–26.6.1")
-                versionBadge("iOS 27", detail: "Beta 1–4")
-            }
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.secondary.opacity(0.10))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-    }
-
-    private func versionBadge(_ title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-            Text(detail)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(
-            Color.primary.opacity(0.06),
-            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-        )
     }
 
     private func featureButton(_ name: String) -> some View {
