@@ -22,5 +22,18 @@ workflows:
             DEVELOPMENT_TEAM="" \
             clean build \
             CONFIGURATION_BUILD_DIR="$CM_BUILD_DIR/build/Release-iphoneos"
+      - name: Empacotar IPA
+        script: |
+          set -e
+          APP_PATH="$CM_BUILD_DIR/build/Release-iphoneos/3105.app"
+          PAYLOAD="$CM_BUILD_DIR/build/Payload"
+          IPA_PATH="$CM_BUILD_DIR/build/3105.ipa"
+          rm -rf "$PAYLOAD" "$IPA_PATH"
+          mkdir -p "$PAYLOAD"
+          cp -R "$APP_PATH" "$PAYLOAD/3105.app"
+          cd "$CM_BUILD_DIR/build"
+          /usr/bin/zip -qry "$IPA_PATH" Payload
+          test -f "$IPA_PATH"
+          echo "IPA criado: $IPA_PATH"
     artifacts:
-      - $CM_BUILD_DIR/build/Release-iphoneos/3105.app
+      - $CM_BUILD_DIR/build/3105.ipa
