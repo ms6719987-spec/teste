@@ -67,7 +67,7 @@ enum PatchProjectLibrary {
 
         // Keep every physical package. packageID is a logical project identifier
         // and must not make another .3105 file disappear from the library.
-        var loadedItems: [PatchLibraryItem] = [:]
+        var loadedItems: [String: PatchLibraryItem] = [:]
         for url in urls where url.pathExtension.lowercased() == "3105" {
             do {
                 let data = try readPackage(at: url)
