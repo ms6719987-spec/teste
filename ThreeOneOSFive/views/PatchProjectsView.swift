@@ -193,10 +193,11 @@ struct PatchProjectsView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
+                .listRowBackground(Color.clear)
                 .environment(\.defaultMinListRowHeight, 0)
                 }
             }
-            .background(Color.black)
+            .background(Color.clear)
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showImporter) {
@@ -327,7 +328,7 @@ struct PatchProjectsView: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
+                        .stroke(Color.clear, lineWidth: 0)
                 }
                 .overlay(alignment: .topTrailing) {
                     if selectedCategory != .hs {
@@ -358,10 +359,7 @@ struct PatchProjectsView: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .stroke(
-                            selectedGame == option ? AppTheme.accent.opacity(0.95) : Color.white.opacity(0.16),
-                            lineWidth: selectedGame == option ? 1.1 : 0.7
-                        )
+                        .stroke(Color.clear, lineWidth: 0)
                 }
                 .shadow(color: selectedGame == option ? AppTheme.accent.opacity(0.32) : .clear, radius: 12)
         }
@@ -407,9 +405,17 @@ struct PatchProjectsView: View {
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
-            .contentShape(Rectangle())
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.clear, lineWidth: 0)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
     }
 
     private var wallpaperSymbol: String {
@@ -518,7 +524,7 @@ struct PatchProjectsView: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AppTheme.accent.opacity(0.22), lineWidth: 0.7)
+                        .stroke(Color.clear, lineWidth: 0)
                 }
                 .shadow(color: AppTheme.accent.opacity(0.09), radius: 14, y: 5)
             }
@@ -695,7 +701,7 @@ private struct PatchProjectRow: View {
                     .fill(AppTheme.accent.opacity(0.16))
                     .overlay {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(AppTheme.accent.opacity(0.32), lineWidth: 0.7)
+                            .stroke(Color.clear, lineWidth: 0)
                     }
                 Image(systemName: item.isLocked ? "lock.fill" : "shippingbox.fill")
                     .font(.system(size: 17, weight: .semibold))

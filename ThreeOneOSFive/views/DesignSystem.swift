@@ -30,10 +30,7 @@ struct AppCardBorder: View {
             cornerRadius: AppTheme.contentCardCornerRadius,
             style: .continuous
         )
-        .strokeBorder(
-            Color(uiColor: .separator).opacity(0.22),
-            lineWidth: 0.5
-        )
+        .strokeBorder(Color.clear, lineWidth: 0)
         .accessibilityHidden(true)
     }
 }
@@ -146,20 +143,10 @@ struct GlassPanel<Content: View>: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(Color.white.opacity(0.025))
             }
+            // Intentionally borderless: the glass effect should blend into the rainy background.
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.26),
-                                AppTheme.accent.opacity(0.28),
-                                Color.white.opacity(0.07)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.8
-                    )
+                    .stroke(Color.clear, lineWidth: 0)
             }
             .shadow(color: AppTheme.accent.opacity(0.10), radius: 18, y: 8)
     }
@@ -219,7 +206,7 @@ struct AppSearchField: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(AppTheme.accent.opacity(0.28), lineWidth: 0.8)
+                .stroke(Color.clear, lineWidth: 0)
         }
         .padding(.horizontal, AppTheme.pageInset)
         .padding(.vertical, 8)

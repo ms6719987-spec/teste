@@ -53,9 +53,7 @@ struct CleanerView: View {
     }
 
     private var selectedBytes: Int64 {
-        records.reduce(0) { result, record in
-            result + (selectedBundleIDs.contains(record.id) ? record.usage.totalBytes : 0)
-        }
+        totalAvailableBytes
     }
 
     private var isBusy: Bool {
@@ -135,13 +133,7 @@ struct CleanerView: View {
                 .padding(.vertical, 20)
             } else {
                 ForEach(filteredRecords) { record in
-                    Button {
-                        toggleSelection(record.id)
-                    } label: {
-                        applicationRow(record)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isCleaning)
+                    applicationRow(record)
                 }
             }
         } header: {
@@ -186,27 +178,20 @@ struct CleanerView: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
 
-            Image(systemName: selectedBundleIDs.contains(record.id) ? "checkmark.circle.fill" : "circle")
+            Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: AppTheme.selectionIconSize, weight: .medium))
-                .foregroundStyle(selectedBundleIDs.contains(record.id) ? AppTheme.accent : Color.secondary)
+                .foregroundStyle(AppTheme.accent)
                 .accessibilityHidden(true)
         }
         .contentShape(Rectangle())
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityValue(
-            selectedBundleIDs.contains(record.id)
-                ? language.text("cleaner.accessibility_selected")
-                : language.text("cleaner.accessibility_not_selected")
-        )
+        .accessibilityValue(language.text("cleaner.accessibility_selected"))
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         if !records.isEmpty {
-            ToolbarItem(placement: .navigationBarLeading) {
-                selectionMenu
-            }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 sortMenu
                 refreshButton
@@ -216,36 +201,6 @@ struct CleanerView: View {
                 refreshButton
             }
         }
-    }
-
-    private var selectionMenu: some View {
-        Menu {
-            Button {
-                selectedBundleIDs = CleanerCatalog.selectingAllVisible(
-                    visibleBundleIDs,
-                    preserving: selectedBundleIDs
-                )
-            } label: {
-                Label(
-                    searchText.isEmpty
-                        ? language.text("patch.select_all")
-                        : language.text("cleaner.select_all_results"),
-                    systemImage: "checkmark.circle"
-                )
-            }
-            .disabled(areAllVisibleRecordsSelected)
-
-            Button {
-                selectedBundleIDs.removeAll()
-            } label: {
-                Label(language.text("patch.deselect_all"), systemImage: "circle")
-            }
-            .disabled(selectedBundleIDs.isEmpty)
-        } label: {
-            Image(systemName: "checklist")
-        }
-        .disabled(isBusy)
-        .accessibilityLabel(language.text("cleaner.selection_actions"))
     }
 
     private var sortMenu: some View {
@@ -284,26 +239,26 @@ struct CleanerView: View {
 
     private var cleanAction: some View {
         Button {
-            activeAlert = .confirmation
+            cleanAllApps()
         } label: {
             HStack(spacing: 8) {
                 if isCleaning {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Image(systemName: "trash")
+                    Image(systemName: "sparkles")
                 }
                 Text(
                     isCleaning
                         ? language.text("cleaner.cleaning")
-                        : language.text("cleaner.clean_button", sizeText(selectedBytes))
+                        : language.text("cleaner.clean_button", sizeText(totalAvailableBytes))
                 )
                 .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.borderedProminent)
-        .disabled(selectedBundleIDs.isEmpty || isBusy)
+        .disabled(records.isEmpty || isBusy)
         .padding(.vertical, 4)
     }
 
@@ -339,35 +294,12 @@ struct CleanerView: View {
 
     private func alert(for alert: CleanerAlert) -> Alert {
         switch alert {
-        case .confirmation:
-            return Alert(
-                title: Text(language.text("cleaner.confirm_title")),
-                message: Text(
-                    language.text(
-                        "cleaner.confirm_message",
-                        Int64(selectedBundleIDs.count),
-                        sizeText(selectedBytes)
-                    )
-                ),
-                primaryButton: .destructive(Text(language.text("cleaner.confirm_action"))) {
-                    cleanSelectedApps()
-                },
-                secondaryButton: .cancel(Text(language.text("common.cancel")))
-            )
         case .result(let message):
             return Alert(
                 title: Text(language.text("cleaner.result_title")),
                 message: Text(message),
                 dismissButton: .default(Text(language.text("common.done")))
             )
-        }
-    }
-
-    private func toggleSelection(_ bundleID: String) {
-        if selectedBundleIDs.contains(bundleID) {
-            selectedBundleIDs.remove(bundleID)
-        } else {
-            selectedBundleIDs.insert(bundleID)
         }
     }
 
@@ -427,12 +359,9 @@ struct CleanerView: View {
                 )
             ]
             records = samples
-            selectedBundleIDs = Set(samples.prefix(2).map(\.id))
+            selectedBundleIDs = Set(samples.map(\.id))
             scannedAppCount = 388
             isScanning = false
-            if ProcessInfo.processInfo.arguments.contains("--simulate-cleaner-warning") {
-                activeAlert = .confirmation
-            }
             return
         }
 #endif
@@ -457,6 +386,7 @@ struct CleanerView: View {
                 DispatchQueue.main.async {
                     guard scanID == requestID else { return }
                     records = snapshot
+                    selectedBundleIDs = Set(snapshot.map(\.id))
                     scannedAppCount = count
                 }
             }
@@ -549,9 +479,9 @@ struct CleanerView: View {
         }
     }
 
-    private func cleanSelectedApps() {
+    private func cleanAllApps() {
         guard !isBusy else { return }
-        let selectedRecords = records.filter { selectedBundleIDs.contains($0.id) }
+        let selectedRecords = records
         guard !selectedRecords.isEmpty else { return }
         isCleaning = true
 
@@ -623,12 +553,10 @@ private struct CleanerAppRecord: Identifiable {
 }
 
 private enum CleanerAlert: Identifiable {
-    case confirmation
     case result(message: String)
 
     var id: String {
         switch self {
-        case .confirmation: return "confirmation"
         case .result(let message): return "result-\(message)"
         }
     }
