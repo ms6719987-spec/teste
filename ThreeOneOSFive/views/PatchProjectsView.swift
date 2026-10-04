@@ -185,14 +185,15 @@ struct PatchProjectsView: View {
                 VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("External ios")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 2)
 
                     iosCompatibilityCard
                 }
                 .padding(.horizontal, AppTheme.pageInset)
-                .padding(.bottom, 10)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
 
                 HStack(spacing: 8) {
                     gameOptionButton(.freeFire)

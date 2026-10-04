@@ -75,14 +75,14 @@
 "dashboard.kernel_inactive" = "Inactive";
 "dashboard.enterprise_signing" = "3105 only works when signed with an enterprise certificate. SideStore, AltStore, 3uTools and LiveContainer are not supported.";
 "dashboard.features" = "Features";
-"dashboard.features_footer" = "Turn on Cleaner or Wallpapers to show it in the app navigation.";
+"dashboard.features_footer" = "Turn on Lixo do sistema or Wallpapers to show it in the app navigation.";
 "tab.home" = "Home";
 "tab.new" = "New";
 "tab.files" = "Files";
 "tab.patches" = "Patches";
-"tab.cleaner" = "Cleaner";
+"tab.cleaner" = "Lixo do sistema";
 
-"cleaner.title" = "Cleaner";
+"cleaner.title" = "Lixo do sistema";
 "cleaner.limited_mode" = "Limited Cleanup";
 "cleaner.available" = "Available to clean";
 "cleaner.selected" = "Selected";
@@ -505,7 +505,7 @@
 "repository.sources" = "Sources";
 "repository.search" = "Search";
 "repository.built_in_tools" = "Built-in Tools";
-"repository.cleaner_subtitle" = "Review and remove app cache and temporary files.";
+"repository.cleaner_subtitle" = "Revise e remova cache e arquivos temporários.";
 "repository.wallpaper_subtitle" = "Import and manage PosterBoard wallpaper packages.";
 "repository.tools_disabled" = "Built-in tools are hidden.";
 "repository.tools_footer" = "Enable or hide these tools from Settings.";

@@ -13,6 +13,7 @@ struct CleanerView: View {
     @State private var hasLoaded = false
     @State private var scanID = UUID()
     @State private var activeAlert: CleanerAlert?
+    @State private var discoveredItems: [String: [LimitedCleanerFileItem]] = [:]
 
     private var filteredRecords: [CleanerAppRecord] {
         let matchingRecords: [CleanerAppRecord]
@@ -134,6 +135,9 @@ struct CleanerView: View {
             } else {
                 ForEach(filteredRecords) { record in
                     applicationRow(record)
+                    ForEach(discoveredItems[record.id] ?? []) { item in
+                        cleanerItemRow(item)
+                    }
                 }
             }
         } header: {
@@ -187,6 +191,30 @@ struct CleanerView: View {
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
         .accessibilityValue(language.text("cleaner.accessibility_selected"))
+    }
+
+    private func cleanerItemRow(_ item: LimitedCleanerFileItem) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc")
+                .font(.caption)
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 22)
+
+            Text(item.relativePath)
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+
+            Spacer(minLength: 8)
+
+            Text(sizeText(item.bytes))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .padding(.leading, 34)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 
     @ToolbarContentBuilder
@@ -436,10 +464,12 @@ struct CleanerView: View {
         scannedAppCount = 0
         selectedBundleIDs.removeAll()
         records.removeAll()
+        discoveredItems.removeAll()
 
         DispatchQueue.global(qos: .userInitiated).async {
             var scannedBundleIDs = Set<String>()
             var discoveredRecords: [CleanerAppRecord] = []
+            var discoveredItemsByBundleID: [String: [LimitedCleanerFileItem]] = [:]
             var processedCount = 0
 
             func publish(force: Bool = false) {
@@ -448,9 +478,11 @@ struct CleanerView: View {
                     $0.app.displayName.localizedCaseInsensitiveCompare($1.app.displayName) == .orderedAscending
                 }
                 let count = processedCount
+                let itemSnapshot = discoveredItemsByBundleID
                 DispatchQueue.main.async {
                     guard scanID == requestID else { return }
                     records = snapshot
+                    discoveredItems = itemSnapshot
                     selectedBundleIDs = Set(snapshot.map(\.id))
                     scannedAppCount = count
                 }
@@ -507,6 +539,10 @@ struct CleanerView: View {
                     discoveredRecords.append(
                         CleanerAppRecord(app: resolvedApp, usage: record.usage)
                     )
+                    discoveredItemsByBundleID[record.bundleID] = (try? LimitedCleanerService.scanItems(
+                        containerURL: URL(fileURLWithPath: record.containerPath, isDirectory: true),
+                        rootValidator: { ContainerStore.isApplicationContainerPath($0.path) }
+                    )) ?? []
                 }
                 publish()
             }
@@ -552,6 +588,7 @@ struct CleanerView: View {
 
         DispatchQueue.global(qos: .userInitiated).async {
             var updatedUsage: [String: LimitedCleanerUsage] = [:]
+            var updatedItems: [String: [LimitedCleanerFileItem]] = [:]
             var freedBytes: Int64 = 0
             var removedItems = 0
             var failedItems = 0
@@ -572,6 +609,10 @@ struct CleanerView: View {
                         rootValidator: { ContainerStore.isApplicationContainerPath($0.path) }
                     )
                     updatedUsage[record.id] = result.after
+                    updatedItems[record.id] = (try? LimitedCleanerService.scanItems(
+                        containerURL: URL(fileURLWithPath: containerPath, isDirectory: true),
+                        rootValidator: { ContainerStore.isApplicationContainerPath($0.path) }
+                    )) ?? []
                     freedBytes += result.freedBytes
                     removedItems += result.removedItemCount
                     failedItems += result.failedItemCount
@@ -597,6 +638,13 @@ struct CleanerView: View {
                     guard let usage = updatedUsage[record.id] else { return record }
                     guard usage.totalBytes > 0 else { return nil }
                     return CleanerAppRecord(app: record.app, usage: usage)
+                }
+                for record in selectedRecords {
+                    if let usage = updatedUsage[record.id], usage.totalBytes > 0 {
+                        discoveredItems[record.id] = updatedItems[record.id] ?? []
+                    } else {
+                        discoveredItems.removeValue(forKey: record.id)
+                    }
                 }
                 selectedBundleIDs.removeAll()
                 isCleaning = false
