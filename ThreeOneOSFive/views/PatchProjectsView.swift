@@ -48,6 +48,7 @@ struct PatchProjectsView: View {
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
     @State private var isCleaningWithCard = false
+    @AppStorage("cleaner.lastFoundBytes") private var cleanerLastFoundBytes: Int = 0
     @State private var searchText = ""
     @State private var selectedGame: GameOption = .freeFire
     @State private var selectedCategory: PatchCategory = .hs
@@ -183,17 +184,32 @@ struct PatchProjectsView: View {
                 RainGlassBackground()
 
                 VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("External ios")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 2)
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Image("ExternalCrown")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 34, height: 28)
+                            .accessibilityHidden(true)
+
+                        Text("External ios")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 2)
+
+                        Text("O MELHOR EXTERNAL FEITO PARA IOS")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .tracking(2.2)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 3)
+                            .padding(.top, 1)
+                    }
 
                     iosCompatibilityCard
                 }
                 .padding(.horizontal, AppTheme.pageInset)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
 
                 HStack(spacing: 8) {
                     gameOptionButton(.freeFire)
@@ -266,6 +282,15 @@ struct PatchProjectsView: View {
                 }
             }
             .background(Color.clear)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Text("© Teus ios")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    .background(.ultraThinMaterial.opacity(0.35))
+            }
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showImporter) {
@@ -494,6 +519,10 @@ struct PatchProjectsView: View {
         )
     }
 
+    private func sizeText(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
     private var cleanerRow: some View {
         Button {
             guard !isCleaningWithCard else { return }
@@ -504,21 +533,25 @@ struct PatchProjectsView: View {
             }
         } label: {
             HStack(spacing: 12) {
-                AppRowIcon(systemName: "sparkles")
+                AppRowIcon(systemName: "trash.fill")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(language.text("tab.cleaner"))
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text(language.text("repository.cleaner_subtitle"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        cleanerLastFoundBytes > 0
+                            ? language.text("cleaner.found_on_card", sizeText(Int64(cleanerLastFoundBytes)))
+                            : language.text("repository.cleaner_subtitle")
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 Spacer()
                 if isCleaningWithCard {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "trash.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
@@ -816,7 +849,7 @@ private struct PatchProjectRow: View {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
                             .stroke(Color.clear, lineWidth: 0)
                     }
-                Image(systemName: item.isLocked ? "lock.fill" : "shippingbox.fill")
+                Image(systemName: item.isLocked ? "lock.fill" : "doc.badge.exclamationmark")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(AppTheme.accent)
             }

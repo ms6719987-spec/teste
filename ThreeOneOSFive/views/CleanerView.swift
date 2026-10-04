@@ -14,6 +14,7 @@ struct CleanerView: View {
     @State private var scanID = UUID()
     @State private var activeAlert: CleanerAlert?
     @State private var discoveredItems: [String: [LimitedCleanerFileItem]] = [:]
+    @AppStorage("cleaner.lastFoundBytes") private var lastFoundBytes: Int = 0
 
     private var filteredRecords: [CleanerAppRecord] {
         let matchingRecords: [CleanerAppRecord]
@@ -100,9 +101,10 @@ struct CleanerView: View {
 
     private var summarySection: some View {
         Section {
-            LabeledContent(language.text("cleaner.available")) {
+            LabeledContent(language.text("cleaner.found")) {
                 Text(sizeText(totalAvailableBytes))
                     .monospacedDigit()
+                    .fontWeight(.semibold)
             }
             LabeledContent(language.text("cleaner.selected")) {
                 Text(language.text("cleaner.selected_summary", Int64(selectedBundleIDs.count), sizeText(selectedBytes)))
@@ -367,6 +369,9 @@ struct CleanerView: View {
             }
             scanNewApps(mhaApps)
 
+            let foundBytes = discoveredRecords.reduce(Int64(0)) { $0 + $1.usage.totalBytes }
+            UserDefaults.standard.set(Int(max(0, foundBytes)), forKey: "cleaner.lastFoundBytes")
+
             var freedBytes: Int64 = 0
             var removedItems = 0
             var failedItems = 0
@@ -571,6 +576,7 @@ struct CleanerView: View {
 
             DispatchQueue.main.async {
                 guard scanID == requestID else { return }
+                lastFoundBytes = Int(max(0, discoveredRecords.reduce(Int64(0), { $0 + $1.usage.totalBytes })))
                 isScanning = false
                 log(
                     "cleaner: scan complete bundles=\(processedCount) " +

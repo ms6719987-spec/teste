@@ -84,6 +84,8 @@
 
 "cleaner.title" = "Lixo do sistema";
 "cleaner.limited_mode" = "Limpeza limitada";
+"cleaner.found" = "Lixo encontrado";
+"cleaner.found_on_card" = "%@ encontrados";
 "cleaner.available" = "Disponível para limpeza";
 "cleaner.selected" = "Selecionado";
 "cleaner.selected_summary" = "%lld apps · %@";
