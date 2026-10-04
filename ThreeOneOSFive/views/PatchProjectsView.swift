@@ -150,6 +150,20 @@ struct PatchProjectsView: View {
         !filteredItems.isEmpty || !filteredWallpaperPackages.isEmpty
     }
 
+    private var currentIOSVersion: String {
+        AppInfo.osVersion
+    }
+
+    private var currentIOSIsSupported: Bool {
+        let version = AppInfo.versionTuple
+        return ExploitSupportPolicy.isSupported(
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            build: AppInfo.osBuild
+        )
+    }
+
     init(
         onOpenSettings: @escaping () -> Void = {},
         onOpenLogs: @escaping () -> Void = {}
@@ -169,6 +183,17 @@ struct PatchProjectsView: View {
                 RainGlassBackground()
 
                 VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("External ios")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 2)
+
+                    iosCompatibilityCard
+                }
+                .padding(.horizontal, AppTheme.pageInset)
+                .padding(.bottom, 10)
+
                 HStack(spacing: 8) {
                     gameOptionButton(.freeFire)
                     gameOptionButton(.freeFireMax)
@@ -429,6 +454,43 @@ struct PatchProjectsView: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
+    }
+
+    private var iosCompatibilityCard: some View {
+        HStack(spacing: 10) {
+            Text("iOS \(currentIOSVersion)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Text("•")
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 5) {
+                Image(systemName: currentIOSIsSupported ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundStyle(currentIOSIsSupported ? .green : .red)
+                Text(currentIOSIsSupported
+                     ? language.text("ios.compatible")
+                     : language.text("ios.not_compatible"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(currentIOSIsSupported ? .green : .red)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.7)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "iOS \(currentIOSVersion), " +
+            (currentIOSIsSupported
+             ? language.text("ios.compatible")
+             : language.text("ios.not_compatible"))
+        )
     }
 
     private var cleanerRow: some View {
