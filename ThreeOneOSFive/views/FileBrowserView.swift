@@ -99,9 +99,11 @@ struct FileBrowserView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(nil)
+                        .listRowBackground(Color.clear)
                 }
+                .listRowBackground(Color.clear)
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .environment(\.defaultMinListRowHeight, AppTheme.fileRowHeight)

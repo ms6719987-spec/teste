@@ -148,7 +148,7 @@ struct PatchProjectsView: View {
                     } else {
                         if !filteredItems.isEmpty {
                             Section(language.text("patch.title")) {
-                                ForEach(filteredItems) { item in
+                                ForEach(filteredItems, id: \.packageURL.path) { item in
                                     itemRow(item)
                                 }
                                 .onDelete { offsets in

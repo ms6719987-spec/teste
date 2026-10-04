@@ -65,7 +65,9 @@ enum PatchProjectLibrary {
                 options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
               ) else { return [] }
 
-        var byID: [UUID: PatchLibraryItem] = [:]
+        // Keep every physical package. packageID is a logical project identifier
+        // and must not make another .3105 file disappear from the library.
+        var loadedItems: [PatchLibraryItem] = [:]
         for url in urls where url.pathExtension.lowercased() == "3105" {
             do {
                 let data = try readPackage(at: url)
@@ -110,13 +112,20 @@ enum PatchProjectLibrary {
                         )
                     }
                 }
-                byID[summary.packageID] = item
+                loadedItems[url.path] = item
             } catch {
                 log("patch: skipped invalid local package \(url.lastPathComponent)")
             }
         }
-        return byID.values.sorted {
-            ($0.project?.updatedAt ?? .distantPast) > ($1.project?.updatedAt ?? .distantPast)
+        return loadedItems.values.sorted {
+            let lhsDate = $0.project?.updatedAt ?? .distantPast
+            let rhsDate = $1.project?.updatedAt ?? .distantPast
+            if lhsDate != rhsDate {
+                return lhsDate > rhsDate
+            }
+            return $0.packageURL.lastPathComponent.localizedStandardCompare(
+                $1.packageURL.lastPathComponent
+            ) == .orderedAscending
         }
     }
 

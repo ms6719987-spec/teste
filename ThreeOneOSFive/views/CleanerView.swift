@@ -78,7 +78,7 @@ struct CleanerView: View {
             .toolbar { toolbarContent }
             .alert(item: $activeAlert, content: alert(for:))
             .onAppear {
-                guard !hasLoaded else { return }
+                // Scan automatically whenever the Cleaner screen appears.
                 hasLoaded = true
                 reload()
             }
@@ -191,50 +191,11 @@ struct CleanerView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if !records.isEmpty {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                sortMenu
-                refreshButton
-            }
-        } else {
-            ToolbarItem(placement: .navigationBarLeading) {
-                refreshButton
-            }
-        }
-    }
-
-    private var sortMenu: some View {
-        Menu {
-            Picker(language.text("cleaner.sort"), selection: $sortOrder) {
-                Label(
-                    language.text("cleaner.sort_largest_first"),
-                    systemImage: "arrow.down"
-                )
-                .tag(CleanerSortOrder.largestFirst)
-
-                Label(
-                    language.text("cleaner.sort_smallest_first"),
-                    systemImage: "arrow.up"
-                )
-                .tag(CleanerSortOrder.smallestFirst)
-            }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        .disabled(isBusy)
-        .accessibilityLabel(language.text("cleaner.sort"))
-    }
-
-    private var refreshButton: some View {
-        Button { reload() } label: {
+        ToolbarItem(placement: .navigationBarTrailing) {
             if isScanning {
                 ProgressView()
-            } else {
-                Image(systemName: "arrow.clockwise")
             }
         }
-        .disabled(isBusy)
-        .accessibilityLabel(language.text("cleaner.scan_again"))
     }
 
     private var cleanAction: some View {
@@ -251,7 +212,7 @@ struct CleanerView: View {
                 Text(
                     isCleaning
                         ? language.text("cleaner.cleaning")
-                        : language.text("cleaner.clean_button", sizeText(totalAvailableBytes))
+                        : "Limpeza de cache"
                 )
                 .fontWeight(.semibold)
             }
@@ -281,9 +242,6 @@ struct CleanerView: View {
                     Text(language.text("cleaner.empty_message"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Button(language.text("cleaner.scan_again")) { reload() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
                 }
             }
             .multilineTextAlignment(.center)

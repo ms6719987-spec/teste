@@ -349,7 +349,9 @@ final class PatchProjectStore: ObservableObject {
     }
 
     private func existingPackageURL(for packageID: UUID) -> URL? {
-        items.first(where: { $0.id == packageID })?.packageURL
+        // Do not collapse separate imported .3105 files just because their
+        // embedded logical packageID happens to be the same.
+        return nil
     }
 
     private nonisolated static func persistImportedPackage(
