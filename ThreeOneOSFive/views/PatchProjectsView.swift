@@ -553,8 +553,8 @@ struct PatchProjectsView: View {
                 await MainActor.run {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
-                        messageKey: privateErrorKey(for: error),
-                        messageArgument: privateErrorArgument(for: error)
+                        messageKey: privateErrorKey(for: error, item: item),
+                        messageArgument: privateErrorArgument(for: error, item: item)
                     )
                 }
             } catch {
@@ -595,8 +595,8 @@ struct PatchProjectsView: View {
                 await MainActor.run {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
-                        messageKey: privateErrorKey(for: error),
-                        messageArgument: privateErrorArgument(for: error)
+                        messageKey: privateErrorKey(for: error, item: item),
+                        messageArgument: privateErrorArgument(for: error, item: item)
                     )
                 }
             } catch {
@@ -655,6 +655,23 @@ struct PatchProjectsView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 64)
     }
+    private func privateErrorKey(for error: PatchPackageError, item: PatchLibraryItem) -> String {
+        guard item.project?.isPrivate == true,
+              item.isAuthorCopy == false else {
+            return error.localizationKey
+        }
+        return "patch.error.private_operation"
+    }
+
+    private func privateErrorArgument(for error: PatchPackageError, item: PatchLibraryItem) -> String? {
+        guard item.project?.isPrivate == true,
+              item.isAuthorCopy == false else {
+            return error.localizationArgument
+        }
+        return nil
+    }
+
+
 }
 
 private struct WallpaperImportFeedback: Identifiable {
