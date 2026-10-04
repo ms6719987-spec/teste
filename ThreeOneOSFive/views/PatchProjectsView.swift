@@ -19,8 +19,18 @@ private enum GameOption: String {
 }
 
 private enum GameAssetFilter {
-    static let freeFire = "assetindexer.U6Zffc4YIR3DslNj3cXvYGAqz58~3D"
-    static let freeFireMax = "assetindexer.YJ~2FW7EkU5pRkVg51NrKyx4LXid8~3D"
+    // Free Fire: show every patch whose target belongs to this exact
+    // Documents/contentcache asset directory. A rule may store the full
+    // target in relativePath or split the target into relativePath +
+    // replacementFilename, so both representations are accepted.
+    static let freeFireDirectory =
+        "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar/assetindexer.U6Zffc4YIR3DslNj3cXvYGAqz58~3D"
+
+    // Free Fire Max: use the complete target path as the filter, just like
+    // Free Fire. This catches rules that store the full path as well as
+    // rules that split the directory and filename into separate fields.
+    static let freeFireMaxDirectory =
+        "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar/assetindexer.YJ~2FW7EkU5pRkVg51NrKyx4LXid8~3D"
 }
 
 private enum PatchCategory: String, CaseIterable {
@@ -37,7 +47,7 @@ struct PatchProjectsView: View {
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
-    @State private var showCleaner = false
+    @State private var isCleaningWithCard = false
     @State private var searchText = ""
     @State private var selectedGame: GameOption = .freeFire
     @State private var selectedCategory: PatchCategory = .hs
@@ -52,17 +62,55 @@ struct PatchProjectsView: View {
 
     private var filteredItems: [PatchLibraryItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let requiredAsset = selectedGame == .freeFire
-            ? GameAssetFilter.freeFire
-            : GameAssetFilter.freeFireMax
-
         return store.items.filter { item in
             guard let project = item.project, item.canInspectContents else { return false }
 
-            // Each game tab only exposes patches containing its corresponding
-            // assetindexer payload. The comparison is exact, as requested.
-            guard project.rules.contains(where: { $0.replacementFilename == requiredAsset }) else {
-                return false
+            if selectedGame == .freeFire {
+                // Free Fire is filtered by the complete target path, not only
+                // by the filename. This makes every matching file visible.
+                let targetPath = GameAssetFilter.freeFireDirectory
+                let hasFreeFireTarget = project.rules.contains { rule in
+                    let relativePath = rule.relativePath
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                    let replacementFilename = rule.replacementFilename
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+                    if relativePath.caseInsensitiveCompare(targetPath) == .orderedSame {
+                        return true
+                    }
+
+                    let combinedPath = relativePath.isEmpty
+                        ? replacementFilename
+                        : relativePath + "/" + replacementFilename
+                    return combinedPath.caseInsensitiveCompare(targetPath) == .orderedSame
+                        || combinedPath.localizedCaseInsensitiveContains(targetPath + "/")
+                }
+
+                guard hasFreeFireTarget else { return false }
+            } else {
+                let targetPath = GameAssetFilter.freeFireMaxDirectory
+                let hasFreeFireMaxTarget = project.rules.contains { rule in
+                    let relativePath = rule.relativePath
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                    let replacementFilename = rule.replacementFilename
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+                    if relativePath.caseInsensitiveCompare(targetPath) == .orderedSame {
+                        return true
+                    }
+
+                    let combinedPath = relativePath.isEmpty
+                        ? replacementFilename
+                        : relativePath + "/" + replacementFilename
+                    return combinedPath.caseInsensitiveCompare(targetPath) == .orderedSame
+                        || combinedPath.localizedCaseInsensitiveContains(targetPath + "/")
+                }
+
+                guard hasFreeFireMaxTarget else { return false }
             }
 
             guard !query.isEmpty else { return true }
@@ -121,12 +169,6 @@ struct PatchProjectsView: View {
                 RainGlassBackground()
 
                 VStack(spacing: 0) {
-                AppSearchField(
-                    text: $searchText,
-                    prompt: language.text("installed.search"),
-                    clearLabel: language.text("common.clear")
-                )
-
                 HStack(spacing: 8) {
                     gameOptionButton(.freeFire)
                     gameOptionButton(.freeFireMax)
@@ -147,7 +189,7 @@ struct PatchProjectsView: View {
                             .listRowSeparator(.hidden)
                     } else {
                         if !filteredItems.isEmpty {
-                            Section(language.text("patch.title")) {
+                            Section {
                                 ForEach(filteredItems, id: \.packageURL.path) { item in
                                     itemRow(item)
                                 }
@@ -185,7 +227,7 @@ struct PatchProjectsView: View {
                         }
                     }
                     if cleanerEnabled {
-                        Section(language.text("repository.utilities")) {
+                        Section {
                             cleanerRow
                         }
                     }
@@ -224,9 +266,6 @@ struct PatchProjectsView: View {
                 ) { project, password in
                     store.create(project: project, password: password)
                 }
-            }
-            .sheet(isPresented: $showCleaner) {
-                CleanerView()
             }
             .sheet(item: $draftCoordinator.request) { request in
                 PatchProjectEditorView(
@@ -277,6 +316,13 @@ struct PatchProjectsView: View {
                     secondaryButton: .cancel(Text(language.text("common.cancel")))
                 )
             }
+            .alert(item: $store.alert) { alert in
+                Alert(
+                    title: Text(language.text(alert.titleKey)),
+                    message: Text(alert.message(language: language)),
+                    dismissButton: .default(Text(language.text("common.ok")))
+                )
+            }
             .onAppear {
                 reloadWallpaperPackages()
                 consumeExternalImport()
@@ -325,7 +371,7 @@ struct PatchProjectsView: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(AppTheme.accent)
                 .frame(width: 42, height: 38)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .stroke(Color.clear, lineWidth: 0)
@@ -352,10 +398,10 @@ struct PatchProjectsView: View {
                 .foregroundStyle(selectedGame == option ? Color.white : .primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .fill(selectedGame == option ? AppTheme.accent.opacity(0.28) : Color.white.opacity(0.025))
+                        .fill(selectedGame == option ? AppTheme.accent.opacity(0.24) : Color.white.opacity(0.018))
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 15, style: .continuous)
@@ -387,7 +433,12 @@ struct PatchProjectsView: View {
 
     private var cleanerRow: some View {
         Button {
-            showCleaner = true
+            guard !isCleaningWithCard else { return }
+            isCleaningWithCard = true
+            CleanerView.performOneTapCleanup()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                isCleaningWithCard = false
+            }
         } label: {
             HStack(spacing: 12) {
                 AppRowIcon(systemName: "sparkles")
@@ -400,17 +451,22 @@ struct PatchProjectsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
+                if isCleaningWithCard {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.clear, lineWidth: 0)
+                    .stroke(Color.white.opacity(0.07), lineWidth: 0.7)
             }
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
@@ -496,12 +552,10 @@ struct PatchProjectsView: View {
                 .buttonStyle(.plain)
             } else {
                 HStack(spacing: 12) {
-                    NavigationLink {
-                        PatchProjectDetailView(store: store, projectID: item.id)
-                    } label: {
-                        PatchProjectRow(item: item, language: language)
-                    }
-                    .buttonStyle(.plain)
+                    // The patch row is intentionally non-navigable.
+                    // Users can only enable/disable the patch from the toggle.
+                    PatchProjectRow(item: item, language: language)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     Toggle(
                         "",
@@ -517,14 +571,10 @@ struct PatchProjectsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(0.025))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.clear, lineWidth: 0)
+                        .stroke(Color.white.opacity(0.07), lineWidth: 0.7)
                 }
                 .shadow(color: AppTheme.accent.opacity(0.09), radius: 14, y: 5)
             }

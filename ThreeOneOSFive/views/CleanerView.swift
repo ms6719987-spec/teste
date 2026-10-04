@@ -261,6 +261,113 @@ struct CleanerView: View {
         }
     }
 
+    /// Runs the same full scan used by the Cleaner screen, then removes all
+    /// reclaimable cache/temporary data without opening the Cleaner UI.
+    static func performOneTapCleanup() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            var scannedBundleIDs = Set<String>()
+            var discoveredRecords: [CleanerAppRecord] = []
+
+            func scanNewApps(_ applications: [InstalledApp]) {
+                let metadata = Dictionary(
+                    applications.map { ($0.bundleID, $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                let catalogApplications = applications.map {
+                    CleanerResolvedApplication(
+                        bundleID: $0.bundleID,
+                        name: $0.name,
+                        containerPath: $0.containerPath,
+                        version: $0.version
+                    )
+                }
+                let newRecords = CleanerCatalog.scanNewApplications(
+                    catalogApplications,
+                    scannedBundleIDs: &scannedBundleIDs,
+                    shouldIncludeBundleID: {
+                        ContainerPresentationPolicy.shouldShow(bundleID: $0)
+                    },
+                    activateContainer: { application in
+                        var activationError: NSString?
+                        return MCMActivateContainerPath(
+                            2,
+                            application.bundleID,
+                            false,
+                            &activationError
+                        )
+                    },
+                    isValidContainerPath: ContainerStore.isApplicationContainerPath,
+                    usageForContainer: { containerPath in
+                        try? LimitedCleanerService.scan(
+                            containerURL: URL(fileURLWithPath: containerPath, isDirectory: true),
+                            rootValidator: { ContainerStore.isApplicationContainerPath($0.path) }
+                        )
+                    }
+                )
+                for record in newRecords {
+                    let original = metadata[record.bundleID]
+                    let resolvedApp = InstalledApp(
+                        bundleID: record.bundleID,
+                        name: record.application.name,
+                        containerPath: record.containerPath,
+                        version: record.application.version,
+                        icon: original?.icon
+                    )
+                    discoveredRecords.append(
+                        CleanerAppRecord(app: resolvedApp, usage: record.usage)
+                    )
+                }
+            }
+
+            let apiApps = ContainerStore.installedAppsFromAPI()
+            let dynamicIdentifiers = ContainerStore.dynamicAppIdentifiers()
+            let mcmApps = ContainerStore.installedAppsFromMCM(identifiers: dynamicIdentifiers)
+            scanNewApps(apiApps + mcmApps)
+
+            let launchServicesIdentifiers = ContainerStore.launchServicesStoreIdentifiers()
+            let candidates = MHAIdentifierCatalog.identifiers(
+                dynamic: dynamicIdentifiers,
+                installed: apiApps.map(\.bundleID),
+                research: ContainerStore.researchAppIdentifiers,
+                custom: [],
+                launchServices: launchServicesIdentifiers
+            )
+            let mhaApps = ContainerStore.installedAppsFromMHACandidates(
+                identifiers: candidates
+            ) { progressiveApps in
+                scanNewApps(progressiveApps)
+            }
+            scanNewApps(mhaApps)
+
+            var freedBytes: Int64 = 0
+            var removedItems = 0
+            var failedItems = 0
+
+            for record in discoveredRecords {
+                guard let containerPath = ContainerStore.resolveAppContainerPath(
+                    bundleID: record.app.bundleID
+                ) else { continue }
+
+                do {
+                    let result = try LimitedCleanerService.clean(
+                        containerURL: URL(fileURLWithPath: containerPath, isDirectory: true),
+                        rootValidator: { ContainerStore.isApplicationContainerPath($0.path) }
+                    )
+                    freedBytes += result.freedBytes
+                    removedItems += result.removedItemCount
+                    failedItems += result.failedItemCount
+                } catch {
+                    failedItems += 1
+                }
+            }
+
+            log(
+                "cleaner: one-tap cleanup complete freed=\(freedBytes) " +
+                "removed=\(removedItems) failed=\(failedItems)"
+            )
+        }
+    }
+
     private func reload() {
         guard !isBusy else { return }
 #if targetEnvironment(simulator)
