@@ -25,15 +25,15 @@ workflows:
       - name: Empacotar IPA
         script: |
           set -e
-          APP_PATH="$CM_BUILD_DIR/build/Release-iphoneos/3105.app"
+          APP_PATH="$CM_BUILD_DIR/build/Release-iphoneos/External.app"
           PAYLOAD="$CM_BUILD_DIR/build/Payload"
-          IPA_PATH="$CM_BUILD_DIR/build/3105.ipa"
+          IPA_PATH="$CM_BUILD_DIR/build/External.ipa"
           rm -rf "$PAYLOAD" "$IPA_PATH"
           mkdir -p "$PAYLOAD"
-          cp -R "$APP_PATH" "$PAYLOAD/3105.app"
+          cp -R "$APP_PATH" "$PAYLOAD/External.app"
           cd "$CM_BUILD_DIR/build"
           /usr/bin/zip -qry "$IPA_PATH" Payload
           test -f "$IPA_PATH"
           echo "IPA criado: $IPA_PATH"
     artifacts:
-      - $CM_BUILD_DIR/build/3105.ipa
+      - $CM_BUILD_DIR/build/External.ipa
