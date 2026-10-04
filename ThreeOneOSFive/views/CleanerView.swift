@@ -1,11 +1,6 @@
 import SwiftUI
 
 struct CleanerView: View {
-    let autoCleanOnAppear: Bool
-
-    init(autoCleanOnAppear: Bool = false) {
-        self.autoCleanOnAppear = autoCleanOnAppear
-    }
     @Environment(\.appLanguage) private var language
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var records: [CleanerAppRecord] = []
@@ -550,13 +545,6 @@ struct CleanerView: View {
                     "cleaner: scan complete bundles=\(processedCount) " +
                         "reclaimableApps=\(discoveredRecords.count)"
                 )
-
-                if autoCleanOnAppear, !discoveredRecords.isEmpty {
-                    selectedBundleIDs = Set(discoveredRecords.map(\.id))
-                    DispatchQueue.main.async {
-                        cleanSelectedApps()
-                    }
-                }
             }
         }
     }

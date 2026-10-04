@@ -38,7 +38,6 @@ struct PatchProjectsView: View {
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
     @State private var showCleaner = false
-    @State private var cleanerAutoClean = false
     @State private var searchText = ""
     @State private var selectedGame: GameOption = .freeFire
     @State private var selectedCategory: PatchCategory = .hs
@@ -125,15 +124,14 @@ struct PatchProjectsView: View {
                     clearLabel: language.text("common.clear")
                 )
 
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     gameOptionButton(.freeFire)
                     gameOptionButton(.freeFireMax)
                     categoryMenu
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, AppTheme.pageInset)
+                .padding(.bottom, 10)
 
-                Divider()
                 List {
                     if !hasLocalContent && (store.isBusy || isImportingWallpapers) {
                         loadingState
@@ -189,21 +187,14 @@ struct PatchProjectsView: View {
                         }
                     }
                 }
-                .listStyle(.insetGrouped)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(AppTheme.pageBackground)
+                .environment(\.defaultMinListRowHeight, 0)
             }
+            .background(AppTheme.pageBackground)
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showImporter = true
-                    } label: {
-                        Image(systemName: "doc.badge.plus")
-                    }
-                    .tint(AppTheme.accent)
-                    .accessibilityLabel("Importar arquivo")
-                }
-            }
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
                     allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -230,7 +221,7 @@ struct PatchProjectsView: View {
                 }
             }
             .sheet(isPresented: $showCleaner) {
-                CleanerView(autoCleanOnAppear: cleanerAutoClean)
+                CleanerView()
             }
             .sheet(item: $draftCoordinator.request) { request in
                 PatchProjectEditorView(
@@ -335,9 +326,8 @@ struct PatchProjectsView: View {
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(AppTheme.accent.opacity(0.42), lineWidth: 0.9)
+                        .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
                 }
-                .transparentBorder(cornerRadius: 11, opacity: 0.10)
                 .overlay(alignment: .topTrailing) {
                     if selectedCategory != .hs {
                         Circle()
@@ -357,18 +347,20 @@ struct PatchProjectsView: View {
         } label: {
             Text(option.rawValue)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selectedGame == option ? Color.white : AppTheme.accent)
+                .foregroundStyle(selectedGame == option ? Color.white : .primary)
                 .frame(maxWidth: .infinity)
-                .frame(height: 38)
+                .frame(height: 40)
                 .background(
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(selectedGame == option ? AppTheme.accent : Color.clear)
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .fill(selectedGame == option ? AppTheme.accent : Color(uiColor: .secondarySystemFill))
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(AppTheme.accent.opacity(0.42), lineWidth: 0.9)
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(
+                            selectedGame == option ? AppTheme.accent : Color(uiColor: .separator).opacity(0.25),
+                            lineWidth: 0.8
+                        )
                 }
-                .transparentBorder(cornerRadius: 11, opacity: 0.10)
         }
         .buttonStyle(.plain)
     }
@@ -394,7 +386,6 @@ struct PatchProjectsView: View {
 
     private var cleanerRow: some View {
         Button {
-            cleanerAutoClean = true
             showCleaner = true
         } label: {
             HStack(spacing: 12) {
@@ -403,20 +394,17 @@ struct PatchProjectsView: View {
                     Text(language.text("tab.cleaner"))
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text("Escanear e limpar")
+                    Text(language.text("repository.cleaner_subtitle"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "sparkles")
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .transparentBorder(cornerRadius: 12, opacity: 0.12)
         }
         .buttonStyle(.plain)
     }
@@ -489,35 +477,51 @@ struct PatchProjectsView: View {
 
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem) -> some View {
-        HStack(spacing: 10) {
-            PatchProjectRow(
-                item: item,
-                language: language
-            )
-            .contentShape(Rectangle())
-
-            Toggle(
-                "",
-                isOn: Binding(
-                    get: { DevicePatchService.latestReceipt(projectID: item.id) != nil },
-                    set: { enabled in
-                        if !item.isLocked {
-                            setPatchActive(enabled, for: item)
-                        } else {
-                            store.requestUnlock(for: item)
-                        }
+        Group {
+            if item.isLocked {
+                Button {
+                    store.requestUnlock(for: item)
+                } label: {
+                    PatchProjectRow(item: item, language: language)
+                }
+                .buttonStyle(.plain)
+            } else {
+                HStack(spacing: 12) {
+                    NavigationLink {
+                        PatchProjectDetailView(store: store, projectID: item.id)
+                    } label: {
+                        PatchProjectRow(item: item, language: language)
                     }
+                    .buttonStyle(.plain)
+
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { DevicePatchService.latestReceipt(projectID: item.id) != nil },
+                            set: { enabled in setPatchActive(enabled, for: item) }
+                        )
+                    )
+                    .labelsHidden()
+                    .tint(AppTheme.accent)
+                    .scaleEffect(0.92)
+                    .fixedSize()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color(uiColor: .secondarySystemBackground))
                 )
-            )
-            .labelsHidden()
-            .tint(AppTheme.accent)
-            .fixedSize()
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color(uiColor: .separator).opacity(0.18), lineWidth: 0.7)
+                }
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Color.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .transparentBorder(cornerRadius: 12, opacity: 0.13)
-        .contentShape(Rectangle())
+        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     private func setPatchActive(_ enabled: Bool, for item: PatchLibraryItem) {
@@ -549,8 +553,8 @@ struct PatchProjectsView: View {
                 await MainActor.run {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
-                        messageKey: error.localizationKey,
-                        messageArgument: error.localizationArgument
+                        messageKey: privateErrorKey(for: error),
+                        messageArgument: privateErrorArgument(for: error)
                     )
                 }
             } catch {
@@ -591,8 +595,8 @@ struct PatchProjectsView: View {
                 await MainActor.run {
                     store.alert = PatchStoreAlert(
                         titleKey: "common.failed",
-                        messageKey: error.localizationKey,
-                        messageArgument: error.localizationArgument
+                        messageKey: privateErrorKey(for: error),
+                        messageArgument: privateErrorArgument(for: error)
                     )
                 }
             } catch {
@@ -664,17 +668,24 @@ private struct PatchProjectRow: View {
     let language: AppLanguage
 
     var body: some View {
-        HStack(spacing: 10) {
-            AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(AppTheme.accent.opacity(0.13))
+                Image(systemName: item.isLocked ? "lock.fill" : "shippingbox.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppTheme.accent)
+            }
+            .frame(width: 38, height: 38)
+
             Text(item.project?.name ?? language.text("patch.locked_project"))
-                .font(.subheadline.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
+
             Spacer(minLength: 4)
         }
         .contentShape(Rectangle())
-        .padding(.vertical, 1)
-        .transparentBorder(cornerRadius: 10, opacity: 0.10)
     }
 }
 
