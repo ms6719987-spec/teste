@@ -117,7 +117,10 @@ struct PatchProjectsView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack {
+                RainGlassBackground()
+
+                VStack(spacing: 0) {
                 AppSearchField(
                     text: $searchText,
                     prompt: language.text("installed.search"),
@@ -189,10 +192,11 @@ struct PatchProjectsView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .background(AppTheme.pageBackground)
+                .background(Color.clear)
                 .environment(\.defaultMinListRowHeight, 0)
+                }
             }
-            .background(AppTheme.pageBackground)
+            .background(Color.black)
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showImporter) {
@@ -320,10 +324,7 @@ struct PatchProjectsView: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(AppTheme.accent)
                 .frame(width: 42, height: 38)
-                .background(
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(Color.clear)
-                )
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .stroke(AppTheme.accent.opacity(0.7), lineWidth: 1)
@@ -350,17 +351,19 @@ struct PatchProjectsView: View {
                 .foregroundStyle(selectedGame == option ? Color.white : .primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
-                .background(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(selectedGame == option ? AppTheme.accent : Color(uiColor: .secondarySystemFill))
-                )
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .fill(selectedGame == option ? AppTheme.accent.opacity(0.28) : Color.white.opacity(0.025))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
                         .stroke(
-                            selectedGame == option ? AppTheme.accent : Color(uiColor: .separator).opacity(0.25),
-                            lineWidth: 0.8
+                            selectedGame == option ? AppTheme.accent.opacity(0.95) : Color.white.opacity(0.16),
+                            lineWidth: selectedGame == option ? 1.1 : 0.7
                         )
                 }
+                .shadow(color: selectedGame == option ? AppTheme.accent.opacity(0.32) : .clear, radius: 12)
         }
         .buttonStyle(.plain)
     }
@@ -508,15 +511,16 @@ struct PatchProjectsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color(uiColor: .secondarySystemBackground))
-                )
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color(uiColor: .separator).opacity(0.18), lineWidth: 0.7)
+                        .fill(Color.white.opacity(0.025))
                 }
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(AppTheme.accent.opacity(0.22), lineWidth: 0.7)
+                }
+                .shadow(color: AppTheme.accent.opacity(0.09), radius: 14, y: 5)
             }
         }
         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
@@ -688,7 +692,11 @@ private struct PatchProjectRow: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(AppTheme.accent.opacity(0.13))
+                    .fill(AppTheme.accent.opacity(0.16))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .stroke(AppTheme.accent.opacity(0.32), lineWidth: 0.7)
+                    }
                 Image(systemName: item.isLocked ? "lock.fill" : "shippingbox.fill")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(AppTheme.accent)
