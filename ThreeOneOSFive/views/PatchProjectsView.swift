@@ -31,6 +31,32 @@ private enum GameAssetFilter {
     // rules that split the directory and filename into separate fields.
     static let freeFireMaxDirectory =
         "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar/assetindexer.YJ~2FW7EkU5pRkVg51NrKyx4LXid8~3D"
+
+    // AIMBOT: show every imported file whose target is Assembly-CSharp-patch.bytes.
+    // The target may be stored as a complete relative path or split between
+    // relativePath and replacementFilename.
+    static let aimbotTarget = "Documents/Assembly-CSharp-patch.bytes"
+
+    static func ruleMatchesTarget(_ rule: PatchRule, target: String) -> Bool {
+        let relativePath = rule.relativePath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let replacementFilename = rule.replacementFilename
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        if relativePath.caseInsensitiveCompare(target) == .orderedSame
+            || replacementFilename.caseInsensitiveCompare(target) == .orderedSame {
+            return true
+        }
+
+        let combinedPath = relativePath.isEmpty
+            ? replacementFilename
+            : relativePath + "/" + replacementFilename
+
+        return combinedPath.caseInsensitiveCompare(target) == .orderedSame
+            || combinedPath.localizedCaseInsensitiveContains(target + "/")
+    }
 }
 
 private enum PatchCategory: String, CaseIterable {
@@ -65,6 +91,38 @@ struct PatchProjectsView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return store.items.filter { item in
             guard let project = item.project, item.canInspectContents else { return false }
+
+            // AIMBOT uses its own target filter and is independent of the
+            // selected game tab, so matching Assembly-CSharp-patch.bytes
+            // entries are shown immediately when AIMBOT is selected.
+            if selectedCategory == .aimbot {
+                let hasAimbotTarget = project.rules.contains { rule in
+                    GameAssetFilter.ruleMatchesTarget(
+                        rule,
+                        target: GameAssetFilter.aimbotTarget
+                    )
+                }
+                guard hasAimbotTarget else { return false }
+
+                guard !query.isEmpty else { return true }
+                if item.packageURL.lastPathComponent.localizedCaseInsensitiveContains(query) {
+                    return true
+                }
+                if project.name.localizedCaseInsensitiveContains(query)
+                    || project.author.localizedCaseInsensitiveContains(query) {
+                    return true
+                }
+                return project.allBundleIdentifiers.contains {
+                        $0.localizedCaseInsensitiveContains(query)
+                    }
+                    || project.directories.contains {
+                        $0.relativePath.localizedCaseInsensitiveContains(query)
+                    }
+                    || project.rules.contains {
+                        $0.relativePath.localizedCaseInsensitiveContains(query)
+                            || $0.replacementFilename.localizedCaseInsensitiveContains(query)
+                    }
+            }
 
             if selectedGame == .freeFire {
                 // Free Fire is filtered by the complete target path, not only
@@ -188,8 +246,10 @@ struct PatchProjectsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Image("ExternalCrown")
                             .resizable()
+                            .renderingMode(.template)
                             .scaledToFit()
                             .frame(width: 34, height: 28)
+                            .foregroundStyle(.white)
                             .accessibilityHidden(true)
 
                         Text("External ios")
@@ -285,11 +345,10 @@ struct PatchProjectsView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Text("© Teus ios")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.accent)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
                     .padding(.bottom, 6)
-                    .background(.ultraThinMaterial.opacity(0.35))
             }
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
@@ -667,12 +726,13 @@ struct PatchProjectsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                // File cards: black translucent glass with a black border.
+                .background(Color.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.07), lineWidth: 0.7)
+                        .stroke(Color.black.opacity(0.90), lineWidth: 1.0)
                 }
-                .shadow(color: AppTheme.accent.opacity(0.09), radius: 14, y: 5)
+                .shadow(color: .black.opacity(0.24), radius: 10, y: 4)
             }
         }
         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
@@ -844,14 +904,34 @@ private struct PatchProjectRow: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(AppTheme.accent.opacity(0.16))
+                    .fill(Color.black.opacity(0.48))
                     .overlay {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(Color.clear, lineWidth: 0)
+                            .stroke(Color.black.opacity(0.88), lineWidth: 1.0)
                     }
-                Image(systemName: item.isLocked ? "lock.fill" : "doc.badge.exclamationmark")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(AppTheme.accent)
+                if item.isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(AppTheme.accent)
+                } else {
+                    // Use two widely available SF Symbols instead of doc.badge.exclamationmark,
+                    // so the file warning remains visible across supported iOS versions.
+                    ZStack(alignment: .bottomTrailing) {
+                        Image(systemName: "doc.fill")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(.white)
+
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(2)
+                            .background(
+                                Circle()
+                                    .fill(AppTheme.accent)
+                            )
+                            .offset(x: 4, y: 4)
+                    }
+                }
             }
             .frame(width: 38, height: 38)
 
