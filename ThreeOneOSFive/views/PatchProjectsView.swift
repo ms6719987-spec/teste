@@ -38,24 +38,35 @@ private enum GameAssetFilter {
     static let aimbotTarget = "Documents/Assembly-CSharp-patch.bytes"
 
     static func ruleMatchesTarget(_ rule: PatchRule, target: String) -> Bool {
-        let relativePath = rule.relativePath
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let replacementFilename = rule.replacementFilename
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
-        if relativePath.caseInsensitiveCompare(target) == .orderedSame
-            || replacementFilename.caseInsensitiveCompare(target) == .orderedSame {
-            return true
+        func normalize(_ value: String) -> String {
+            var path = value
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\", with: "/")
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if path.lowercased().hasPrefix("documents/") {
+                path = String(path.dropFirst("documents/".count))
+            }
+            return path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         }
 
-        let combinedPath = relativePath.isEmpty
-            ? replacementFilename
-            : relativePath + "/" + replacementFilename
+        let normalizedTarget = normalize(target)
+        let relativePath = normalize(rule.relativePath)
+        let replacementFilename = normalize(rule.replacementFilename)
 
-        return combinedPath.caseInsensitiveCompare(target) == .orderedSame
-            || combinedPath.localizedCaseInsensitiveContains(target + "/")
+        // Imported packages store paths relative to the app's Documents
+        // directory, so "Documents/Assembly-CSharp-patch.bytes" is commonly
+        // represented simply as "Assembly-CSharp-patch.bytes".
+        let candidates = [
+            relativePath,
+            replacementFilename,
+            relativePath.isEmpty ? replacementFilename : relativePath + "/" + replacementFilename
+        ].filter { !$0.isEmpty }
+
+        return candidates.contains { candidate in
+            candidate.caseInsensitiveCompare(normalizedTarget) == .orderedSame
+                || candidate.hasSuffix("/" + normalizedTarget)
+                || normalizedTarget.hasSuffix("/" + candidate)
+        }
     }
 }
 
