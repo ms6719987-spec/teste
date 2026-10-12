@@ -62,7 +62,6 @@ private enum GameAssetFilter {
 private enum PatchCategory: String, CaseIterable {
     case hs = "HS"
     case aimbot = "AIMBOT"
-    case textura = "TEXTURA"
 }
 
 struct PatchProjectsView: View {
