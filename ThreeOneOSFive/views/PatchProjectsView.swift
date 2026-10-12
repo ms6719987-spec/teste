@@ -275,12 +275,17 @@ struct PatchProjectsView: View {
                             .foregroundStyle(.white)
                             .accessibilityHidden(true)
 
-                        Text("EXTERNAL")
-                            .font(.system(size: 34, weight: .black, design: .rounded).italic())
-                            .tracking(1.0)
-                            .foregroundStyle(AppTheme.accent)
-                            .shadow(color: AppTheme.accent.opacity(0.85), radius: 12, x: 0, y: 0)
+                        Text("External ios")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 2)
+
+                        Text("O MELHOR EXTERNAL FEITO PARA IOS")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .tracking(2.2)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 3)
+                            .padding(.top, 1)
                     }
 
                     iosCompatibilityCard
