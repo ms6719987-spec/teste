@@ -44,24 +44,22 @@ struct RainGlassBackground: View {
             ZStack {
                 Color.black
 
+                // Static cosmic wallpaper: branding is rendered separately by SwiftUI.
+                Image("ExternalCosmicBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .overlay(Color.black.opacity(0.20))
+
                 RadialGradient(
                     colors: [
-                        AppTheme.accent.opacity(0.20),
+                        AppTheme.accent.opacity(0.12),
                         .clear
                     ],
                     center: .topTrailing,
                     startRadius: 10,
                     endRadius: max(proxy.size.width, proxy.size.height) * 0.85
-                )
-
-                RadialGradient(
-                    colors: [
-                        Color(red: 0.10, green: 0.16, blue: 0.22).opacity(0.70),
-                        .clear
-                    ],
-                    center: .topLeading,
-                    startRadius: 10,
-                    endRadius: max(proxy.size.width, proxy.size.height) * 0.80
                 )
 
                 TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in

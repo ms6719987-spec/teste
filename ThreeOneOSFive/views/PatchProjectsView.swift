@@ -38,35 +38,24 @@ private enum GameAssetFilter {
     static let aimbotTarget = "Documents/Assembly-CSharp-patch.bytes"
 
     static func ruleMatchesTarget(_ rule: PatchRule, target: String) -> Bool {
-        func normalize(_ value: String) -> String {
-            var path = value
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .replacingOccurrences(of: "\\", with: "/")
-                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            if path.lowercased().hasPrefix("documents/") {
-                path = String(path.dropFirst("documents/".count))
-            }
-            return path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let relativePath = rule.relativePath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let replacementFilename = rule.replacementFilename
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        if relativePath.caseInsensitiveCompare(target) == .orderedSame
+            || replacementFilename.caseInsensitiveCompare(target) == .orderedSame {
+            return true
         }
 
-        let normalizedTarget = normalize(target)
-        let relativePath = normalize(rule.relativePath)
-        let replacementFilename = normalize(rule.replacementFilename)
+        let combinedPath = relativePath.isEmpty
+            ? replacementFilename
+            : relativePath + "/" + replacementFilename
 
-        // Imported packages store paths relative to the app's Documents
-        // directory, so "Documents/Assembly-CSharp-patch.bytes" is commonly
-        // represented simply as "Assembly-CSharp-patch.bytes".
-        let candidates = [
-            relativePath,
-            replacementFilename,
-            relativePath.isEmpty ? replacementFilename : relativePath + "/" + replacementFilename
-        ].filter { !$0.isEmpty }
-
-        return candidates.contains { candidate in
-            candidate.caseInsensitiveCompare(normalizedTarget) == .orderedSame
-                || candidate.hasSuffix("/" + normalizedTarget)
-                || normalizedTarget.hasSuffix("/" + candidate)
-        }
+        return combinedPath.caseInsensitiveCompare(target) == .orderedSame
+            || combinedPath.localizedCaseInsensitiveContains(target + "/")
     }
 }
 
@@ -100,7 +89,7 @@ struct PatchProjectsView: View {
 
     private var filteredItems: [PatchLibraryItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return store.items.filter { item in
+        let matchingItems = store.items.filter { item in
             guard let project = item.project, item.canInspectContents else { return false }
 
             // AIMBOT uses its own target filter and is independent of the
@@ -202,6 +191,29 @@ struct PatchProjectsView: View {
                         || $0.replacementFilename.localizedCaseInsensitiveContains(query)
                 }
         }
+
+        // Avoid rendering the same imported package more than once when the
+        // library contains duplicate entries for the same package ID/path.
+        var seenPackageIDs = Set<UUID>()
+        var seenPaths = Set<String>()
+        var seenNames = Set<String>()
+        return matchingItems.filter { item in
+            let path = item.packageURL.standardizedFileURL.path
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let filename = item.packageURL.lastPathComponent
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            guard !seenPackageIDs.contains(item.id),
+                  !seenPaths.contains(path),
+                  !seenNames.contains(filename) else {
+                return false
+            }
+            seenPackageIDs.insert(item.id)
+            seenPaths.insert(path)
+            seenNames.insert(filename)
+            return true
+        }
     }
 
     private var filteredWallpaperPackages: [WallpaperStagedPackage] {
@@ -263,17 +275,12 @@ struct PatchProjectsView: View {
                             .foregroundStyle(.white)
                             .accessibilityHidden(true)
 
-                        Text("External ios")
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
+                        Text("EXTERNAL")
+                            .font(.system(size: 34, weight: .black, design: .rounded).italic())
+                            .tracking(1.0)
+                            .foregroundStyle(AppTheme.accent)
+                            .shadow(color: AppTheme.accent.opacity(0.85), radius: 12, x: 0, y: 0)
                             .padding(.horizontal, 2)
-
-                        Text("O MELHOR EXTERNAL FEITO PARA IOS")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .tracking(2.2)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 3)
-                            .padding(.top, 1)
                     }
 
                     iosCompatibilityCard
