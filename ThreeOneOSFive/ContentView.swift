@@ -3,12 +3,28 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var patchStore: PatchProjectStore
     @AppStorage("external.login.authenticated") private var isAuthenticated = false
-    @AppStorage("external.login.expiry") private var expiryTimestamp: Double = 0
+    // Data fixa: 12/10/2026 às 00:00 no horário de Brasília + 32 dias.
+    private let licenseExpiry: Double = 1794538800
+    @AppStorage("external.login.lastSeen") private var lastSeenTimestamp: Double = 0
+    @AppStorage("external.login.clockRollback") private var clockRollbackDetected = false
     @State private var showSettings = false
     @State private var showLogs = false
 
     private var hasExpired: Bool {
-        expiryTimestamp > 0 && Date().timeIntervalSince1970 >= expiryTimestamp
+        Date().timeIntervalSince1970 >= licenseExpiry || clockRollbackDetected
+    }
+
+    private var daysRemaining: Int {
+        max(0, Int(ceil((licenseExpiry - Date().timeIntervalSince1970) / 86400)))
+    }
+
+    private func validateClock() {
+        let now = Date().timeIntervalSince1970
+        if lastSeenTimestamp > 0 && now < lastSeenTimestamp - 300 {
+            clockRollbackDetected = true
+        } else if now > lastSeenTimestamp {
+            lastSeenTimestamp = now
+        }
     }
 
     var body: some View {
@@ -20,8 +36,8 @@ struct ContentView: View {
                 )
                 .tint(AppTheme.accent)
                 .overlay(alignment: .topTrailing) {
-                    if expiryTimestamp > 0 {
-                        Text("Expira em \(max(0, Int(ceil((expiryTimestamp - Date().timeIntervalSince1970) / 86400)))) dias")
+                    if !hasExpired {
+                        Text("Expira em \(daysRemaining) dias")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.8))
                             .padding(.horizontal, 9)
@@ -36,14 +52,12 @@ struct ContentView: View {
                 .patchStorePresentation(patchStore)
             } else {
                 ExternalLoginView(isExpired: hasExpired) {
-                    if expiryTimestamp == 0 {
-                        expiryTimestamp = Date().addingTimeInterval(32 * 24 * 60 * 60).timeIntervalSince1970
-                    }
                     isAuthenticated = true
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear { validateClock() }
     }
 }
 
@@ -51,7 +65,6 @@ private struct ExternalLoginView: View {
     let isExpired: Bool
     let onLogin: () -> Void
 
-    @State private var username = ""
     @State private var password = ""
     @State private var errorMessage: String?
 
@@ -80,16 +93,6 @@ private struct ExternalLoginView: View {
 
                 VStack(spacing: 14) {
                     HStack(spacing: 12) {
-                        Image(systemName: "person.fill").foregroundStyle(.red)
-                        TextField("Usuário", text: $username)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                    .padding(15)
-                    .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13))
-                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.12), lineWidth: 1))
-
-                    HStack(spacing: 12) {
                         Image(systemName: "lock.fill").foregroundStyle(.red)
                         SecureField("Senha", text: $password)
                     }
@@ -107,11 +110,10 @@ private struct ExternalLoginView: View {
                     Button {
                         if isExpired {
                             errorMessage = "Este acesso expirou. É necessário renovar a licença."
-                        } else if username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "external"
-                                    && password == "external123" {
+                        } else if password == "external123" {
                             onLogin()
                         } else {
-                            errorMessage = "Usuário ou senha incorretos."
+                            errorMessage = "Senha incorreta."
                         }
                     } label: {
                         HStack {
@@ -133,7 +135,7 @@ private struct ExternalLoginView: View {
                 .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.red.opacity(0.28), lineWidth: 1))
 
-                Text("LICENÇA DE 32 DIAS APÓS O PRIMEIRO LOGIN")
+                Text("LICENÇA VÁLIDA ATÉ 13/11/2026")
                     .font(.system(size: 9, weight: .semibold))
                     .tracking(1)
                     .foregroundStyle(.white.opacity(0.45))
