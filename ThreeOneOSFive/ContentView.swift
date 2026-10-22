@@ -2,9 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var patchStore: PatchProjectStore
-    @AppStorage("external.login.authenticated") private var isAuthenticated = false
-    // Data fixa: 12/10/2026 às 00:00 no horário de Brasília + 32 dias.
-    private let licenseExpiry: Double = 1794538800
+    @State private var isAuthenticated = false
+    // Validade fixa até 22/11/2026 às 00:00 no horário de Brasília.
+    private let licenseExpiry: Double = 1795316400
     @AppStorage("external.login.lastSeen") private var lastSeenTimestamp: Double = 0
     @AppStorage("external.login.clockRollback") private var clockRollbackDetected = false
     @State private var showSettings = false
@@ -14,9 +14,6 @@ struct ContentView: View {
         Date().timeIntervalSince1970 >= licenseExpiry || clockRollbackDetected
     }
 
-    private var daysRemaining: Int {
-        max(0, Int(ceil((licenseExpiry - Date().timeIntervalSince1970) / 86400)))
-    }
 
     private func validateClock() {
         let now = Date().timeIntervalSince1970
@@ -35,18 +32,6 @@ struct ContentView: View {
                     onOpenLogs: { showLogs = true }
                 )
                 .tint(AppTheme.accent)
-                .overlay(alignment: .topTrailing) {
-                    if !hasExpired {
-                        Text("Expira em \(daysRemaining) dias")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(.black.opacity(0.45), in: Capsule())
-                            .padding(.top, 6)
-                            .padding(.trailing, 10)
-                    }
-                }
                 .sheet(isPresented: $showSettings) { SettingsView() }
                 .sheet(isPresented: $showLogs) { LogView() }
                 .patchStorePresentation(patchStore)
@@ -86,7 +71,7 @@ private struct ExternalLoginView: View {
                     .font(.system(size: 32, weight: .black, design: .rounded))
                     .tracking(3)
                     .foregroundStyle(Color(red: 1, green: 0.15, blue: 0.19))
-                Text(isExpired ? "ACESSO EXPIRADO" : "ENTRAR NA SUA CONTA")
+                Text("ENTRAR NA SUA CONTA")
                     .font(.system(size: 12, weight: .bold))
                     .tracking(2)
                     .foregroundStyle(.white.opacity(0.72))
@@ -109,7 +94,7 @@ private struct ExternalLoginView: View {
 
                     Button {
                         if isExpired {
-                            errorMessage = "Este acesso expirou. É necessário renovar a licença."
+                            errorMessage = "Não foi possível validar o acesso."
                         } else if password == "external123" {
                             onLogin()
                         } else {
@@ -135,10 +120,6 @@ private struct ExternalLoginView: View {
                 .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.red.opacity(0.28), lineWidth: 1))
 
-                Text("LICENÇA VÁLIDA ATÉ 13/11/2026")
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1)
-                    .foregroundStyle(.white.opacity(0.45))
                 Spacer()
                 Text("© Teus ios")
                     .font(.system(size: 11, weight: .semibold))
