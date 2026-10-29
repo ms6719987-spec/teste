@@ -20,6 +20,7 @@ struct PatchProjectsView: View {
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @AppStorage("installed.activePackageIDs") private var activePackageIDsRaw = ""
     @State private var togglingPackageIDs: Set<String> = []
+    @State private var actionAlert: PatchStoreAlert?
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
@@ -262,6 +263,13 @@ struct PatchProjectsView: View {
                         deleteWallpaperPackage(package)
                     },
                     secondaryButton: .cancel(Text(language.text("common.cancel")))
+                )
+            }
+            .alert(item: $actionAlert) { alert in
+                Alert(
+                    title: Text(language.text(alert.titleKey)),
+                    message: Text(alert.message(language: language)),
+                    dismissButton: .default(Text(language.text("common.ok")))
                 )
             }
             .onAppear {
