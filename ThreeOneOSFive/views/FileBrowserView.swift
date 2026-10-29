@@ -32,7 +32,6 @@ struct FileBrowserView: View {
     @State private var importConflict: FileImportConflict?
     @State private var isSelecting = false
     @State private var selectedEntryIDs = Set<String>()
-    @State private var enabledFilePaths = Set<String>()
     @State private var transferSession: FileTransferSession?
     @State private var transferConflict: FileTransferConflict?
     @State private var deleteTargets: [FileEntry] = []
@@ -402,7 +401,6 @@ struct FileBrowserView: View {
                 )
             }
             .buttonStyle(.plain)
-            .listRowBackground(Color.black.opacity(0.30))
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         } else if entry.isDirectory {
             NavigationLink(
@@ -416,31 +414,12 @@ struct FileBrowserView: View {
                 FileEntryRow(entry: entry, language: language, selectionState: nil)
             }
             .contextMenu { fileActions(for: entry) }
-            .listRowBackground(Color.black.opacity(0.30))
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         } else {
-            HStack(spacing: 12) {
-                FileEntryRow(entry: entry, language: language, selectionState: nil)
-                Spacer(minLength: 8)
-                Toggle(
-                    "Ativar \(entry.name)",
-                    isOn: Binding(
-                        get: { enabledFilePaths.contains(entry.path) },
-                        set: { isEnabled in
-                            if isEnabled {
-                                enabledFilePaths.insert(entry.path)
-                            } else {
-                                enabledFilePaths.remove(entry.path)
-                            }
-                        }
-                    )
-                )
-                .labelsHidden()
-                .accessibilityLabel("Ativar \(entry.name)")
-            }
-            .contextMenu { fileActions(for: entry) }
-            .listRowBackground(Color.black.opacity(0.30))
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            FileEntryRow(entry: entry, language: language, selectionState: nil)
+                .contextMenu { fileActions(for: entry) }
+                .listRowBackground(Color.black.opacity(0.28))
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         }
     }
 
@@ -1493,6 +1472,14 @@ private struct FileEntryRow: View {
     let entry: FileEntry
     let language: AppLanguage
     let selectionState: Bool?
+    @AppStorage private var isActivated: Bool
+
+    init(entry: FileEntry, language: AppLanguage, selectionState: Bool?) {
+        self.entry = entry
+        self.language = language
+        self.selectionState = selectionState
+        _isActivated = AppStorage(wrappedValue: false, "file.activation.\(entry.path)")
+    }
 
     private var fileExtension: String {
         (entry.name as NSString).pathExtension.lowercased()
@@ -1500,53 +1487,16 @@ private struct FileEntryRow: View {
 
     private var symbol: String {
         if entry.isDirectory { return "folder.fill" }
-        if ["jpg", "jpeg", "png", "gif", "heic", "webp"].contains(fileExtension) {
-            return "photo"
-        }
-        if ["zip", "rar", "7z", "tar", "gz"].contains(fileExtension) {
-            return "archivebox.fill"
-        }
-        if ["plist", "json", "txt", "log", "xml", "strings"].contains(fileExtension) {
-            return "doc.text.fill"
-        }
+        if ["jpg", "jpeg", "png", "gif", "heic", "webp"].contains(fileExtension) { return "photo" }
+        if ["zip", "rar", "7z", "tar", "gz"].contains(fileExtension) { return "archivebox.fill" }
+        if ["plist", "json", "txt", "log", "xml", "strings"].contains(fileExtension) { return "doc.text.fill" }
         return "doc.fill"
     }
 
     private var tint: Color {
         if entry.isDirectory { return .blue }
-        if ["jpg", "jpeg", "png", "gif", "heic", "webp"].contains(fileExtension) {
-            return .purple
-        }
+        if ["jpg", "jpeg", "png", "gif", "heic", "webp"].contains(fileExtension) { return .purple }
         return AppTheme.accent
-    }
-
-    private var detailText: String {
-        var components: [String] = []
-        if entry.isDirectory {
-            switch entry.size {
-            case -1:
-                components.append(language.text("browser.calculating_size"))
-            case -2:
-                components.append(language.text("browser.size_unavailable"))
-            default:
-                components.append(entry.sizeText)
-            }
-            if let childCount = entry.childCount {
-                components.append(language.text("browser.children_count", Int64(childCount)))
-            }
-        } else {
-            components.append(entry.sizeText)
-        }
-        if let modifiedAt = entry.modifiedAt {
-            components.append(
-                DateFormatter.localizedString(
-                    from: modifiedAt,
-                    dateStyle: .short,
-                    timeStyle: .short
-                )
-            )
-        }
-        return components.joined(separator: " · ")
     }
 
     var body: some View {
@@ -1557,30 +1507,28 @@ private struct FileEntryRow: View {
                 symbolSize: AppTheme.fileRowIconSize,
                 frameSize: AppTheme.fileRowIconFrame
             )
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(entry.name)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                    .truncationMode(.middle)
-                Text(detailText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
+            Text(entry.name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .truncationMode(.middle)
             Spacer(minLength: 4)
-
             if let selectionState {
                 Image(systemName: selectionState ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: AppTheme.selectionIconSize, weight: .medium))
                     .foregroundStyle(selectionState ? AppTheme.accent : Color.secondary)
                     .accessibilityHidden(true)
+            } else {
+                Toggle("Ativar", isOn: $isActivated)
+                    .labelsHidden()
+                    .tint(AppTheme.accent)
+                    .accessibilityLabel("Ativar \\(entry.name)")
+                    .scaleEffect(0.85)
             }
         }
+        .padding(.vertical, 2)
+        .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 

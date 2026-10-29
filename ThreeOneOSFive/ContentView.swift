@@ -14,30 +14,42 @@ struct ContentView: View {
     @State private var showLogs = false
 
     init() {
-        _tabNavigation = State(
-            initialValue: AppTabNavigationState(selectedTab: AppSection.installed.rawValue)
-        )
 #if targetEnvironment(simulator)
+        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: AppSection.installed.rawValue))
         _showSettings = State(
-            initialValue: ProcessInfo.processInfo.arguments.contains("--simulate-settings")
+            initialValue: arguments.contains("--simulate-settings")
         )
+#else
+        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: AppSection.installed.rawValue))
 #endif
     }
 
     var body: some View {
-        sectionContent(.installed)
-            .tint(AppTheme.accent)
-            .imageScale(.small)
-            .onChange(of: patchDraftCoordinator.request?.id) { requestID in
-                if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
+        Group {
+            if horizontalSizeClass == .regular {
+                regularLayout
+            } else {
+                compactLayout
             }
-            .onChange(of: patchDraftCoordinator.importRequest?.id) { requestID in
-                if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
-            }
-            .sheet(isPresented: $showSettings) { SettingsView() }
-            .sheet(isPresented: $showLogs) { LogView() }
-            .patchStorePresentation(patchStore)
-            .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
+        }
+        .tint(AppTheme.accent)
+        .imageScale(.small)
+        .onChange(of: patchDraftCoordinator.request?.id) { requestID in
+            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
+        }
+        .onChange(of: patchDraftCoordinator.importRequest?.id) { requestID in
+            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
+        }
+        .onChange(of: developerModeEnabled) { _ in
+            tabNavigation.reconcileSelection(with: featureVisibility)
+        }
+        .onAppear {
+            tabNavigation.reconcileSelection(with: featureVisibility)
+        }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showLogs) { LogView() }
+        .patchStorePresentation(patchStore)
+        .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
     }
 
     private var compactLayout: some View {
@@ -118,6 +130,11 @@ struct ContentView: View {
                 onOpenSettings: openSettings,
                 onOpenLogs: openLogs
             )
+        case .search:
+            RepositorySearchView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
         }
     }
 
@@ -153,7 +170,7 @@ struct ContentView: View {
         let selected = AppSection(rawValue: tabNavigation.selectedTab)
         return selected.flatMap {
             featureVisibility.isVisible($0) ? $0 : nil
-        } ?? .home
+        } ?? .installed
     }
 
     private func openSettings() {
@@ -192,6 +209,7 @@ private extension AppSection {
         case .sources: return "tab.sources"
         case .installed: return "tab.installed"
         case .files: return "tab.files"
+        case .search: return "tab.search"
         }
     }
 
@@ -202,6 +220,7 @@ private extension AppSection {
         case .sources: return "shippingbox.fill"
         case .installed: return "tray.full.fill"
         case .files: return "folder.fill"
+        case .search: return "magnifyingglass"
         }
     }
 }
