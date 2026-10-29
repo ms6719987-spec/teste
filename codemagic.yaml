@@ -19,17 +19,17 @@ workflows:
             -target "$XCODE_TARGET" \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath "$CM_BUILD_DIR/build" \
+            CONFIGURATION_BUILD_DIR="$CM_BUILD_DIR/build/Release-iphoneos" \
             CODE_SIGNING_ALLOWED=NO \
             build
       - name: Package unsigned IPA
         script: |
           set -euo pipefail
-          APP_PATH="$CM_BUILD_DIR/build/Build/Products/Release-iphoneos/3105.app"
+          APP_PATH="$CM_BUILD_DIR/build/Release-iphoneos/3105.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "ERROR: App não encontrado em: $APP_PATH"
             echo "Apps encontrados:"
-            find "$CM_BUILD_DIR/build/Build/Products" -maxdepth 3 -name '*.app' -print || true
+            find "$CM_BUILD_DIR/build" -maxdepth 4 -name '*.app' -print || true
             exit 1
           fi
           mkdir -p "$CM_BUILD_DIR/ipa/Payload"
@@ -37,4 +37,4 @@ workflows:
           (cd "$CM_BUILD_DIR/ipa" && /usr/bin/zip -qry "$CM_BUILD_DIR/External-unsigned.ipa" Payload)
     artifacts:
       - External-unsigned.ipa
-      - build/Build/Products/Release-iphoneos/*.app
+      - build/Release-iphoneos/*.app
