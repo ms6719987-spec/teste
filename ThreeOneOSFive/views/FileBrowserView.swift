@@ -401,7 +401,7 @@ struct FileBrowserView: View {
                 )
             }
             .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 10))
         } else if entry.isDirectory {
             NavigationLink(
                 value: FileBrowserDestination(
@@ -414,16 +414,13 @@ struct FileBrowserView: View {
                 FileEntryRow(entry: entry, language: language, selectionState: nil)
             }
             .contextMenu { fileActions(for: entry) }
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 10))
         } else {
-            NavigationLink {
-                FileQuickLookView(file: entry)
-            } label: {
-                FileEntryRow(entry: entry, language: language, selectionState: nil)
-            }
-            .contextMenu { fileActions(for: entry) }
-            .accessibilityHint(language.text("browser.file_actions_hint"))
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            // Arquivos são apenas exibidos na lista; tocar neles não abre a pré-visualização.
+            FileEntryRow(entry: entry, language: language, selectionState: nil)
+                .contentShape(Rectangle())
+                .contextMenu { fileActions(for: entry) }
+                .listRowInsets(EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 10))
         }
     }
 
@@ -1533,7 +1530,7 @@ private struct FileEntryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 11) {
+        HStack(spacing: 7) {
             AppRowIcon(
                 systemName: symbol,
                 tint: tint,
@@ -1541,13 +1538,13 @@ private struct FileEntryRow: View {
                 frameSize: AppTheme.fileRowIconFrame
             )
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     .truncationMode(.middle)
                 Text(detailText)
-                    .font(.caption)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)

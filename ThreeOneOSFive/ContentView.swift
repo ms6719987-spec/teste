@@ -27,8 +27,6 @@ struct ContentView: View {
             initialTab = 3
         } else if arguments.contains("--simulate-files-tab") {
             initialTab = 4
-        } else if arguments.contains("--simulate-search-tab") {
-            initialTab = 5
         } else {
             initialTab = 0
         }
@@ -50,6 +48,7 @@ struct ContentView: View {
             }
         }
         .tint(AppTheme.accent)
+        .preferredColorScheme(.dark)
         .imageScale(.small)
         .onChange(of: patchDraftCoordinator.request?.id) { requestID in
             if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
@@ -109,11 +108,6 @@ struct ContentView: View {
         case .files:
             AppDataBrowserView(
                 tabSession: filesTabSession,
-                onOpenSettings: openSettings,
-                onOpenLogs: openLogs
-            )
-        case .search:
-            RepositorySearchView(
                 onOpenSettings: openSettings,
                 onOpenLogs: openLogs
             )
@@ -191,7 +185,6 @@ private extension AppSection {
         case .sources: return "tab.sources"
         case .installed: return "tab.installed"
         case .files: return "tab.files"
-        case .search: return "tab.search"
         }
     }
 
@@ -202,7 +195,6 @@ private extension AppSection {
         case .sources: return "shippingbox.fill"
         case .installed: return "tray.full.fill"
         case .files: return "folder.fill"
-        case .search: return "magnifyingglass"
         }
     }
 }
