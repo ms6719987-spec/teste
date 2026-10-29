@@ -1,132 +1,207 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
+    @Environment(\.appLanguage) private var language
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @EnvironmentObject private var patchDraftCoordinator: PatchDraftCoordinator
     @EnvironmentObject private var patchStore: PatchProjectStore
-    @State private var isAuthenticated = false
-    // Validade fixa até 22/11/2026 às 00:00 no horário de Brasília.
-    private let licenseExpiry: Double = 1795316400
-    @AppStorage("external.login.lastSeen") private var lastSeenTimestamp: Double = 0
-    @AppStorage("external.login.clockRollback") private var clockRollbackDetected = false
+    @EnvironmentObject private var repositoryStore: PackageRepositoryStore
+    @AppStorage(FeatureVisibility.developerModeStorageKey)
+    private var developerModeEnabled = false
+    @State private var tabNavigation: AppTabNavigationState
     @State private var showSettings = false
     @State private var showLogs = false
 
-    private var hasExpired: Bool {
-        Date().timeIntervalSince1970 >= licenseExpiry || clockRollbackDetected
-    }
-
-
-    private func validateClock() {
-        let now = Date().timeIntervalSince1970
-        if lastSeenTimestamp > 0 && now < lastSeenTimestamp - 300 {
-            clockRollbackDetected = true
-        } else if now > lastSeenTimestamp {
-            lastSeenTimestamp = now
+    init() {
+#if targetEnvironment(simulator)
+        let arguments = ProcessInfo.processInfo.arguments
+        let initialTab: Int
+        if arguments.contains("--simulate-new-tab") {
+            initialTab = 1
+        } else if arguments.contains("--simulate-sources-tab") {
+            initialTab = 2
+        } else if arguments.contains("--simulate-installed-tab")
+                    || arguments.contains("--simulate-patch-tab")
+                    || arguments.contains("--simulate-wallpaper-tab") {
+            initialTab = 3
+        } else if arguments.contains("--simulate-files-tab") {
+            initialTab = 4
+        } else if arguments.contains("--simulate-search-tab") {
+            initialTab = 5
+        } else {
+            initialTab = AppSection.installed.rawValue
         }
+        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: initialTab))
+        _showSettings = State(
+            initialValue: arguments.contains("--simulate-settings")
+        )
+#else
+        _tabNavigation = State(initialValue: AppTabNavigationState())
+#endif
     }
 
     var body: some View {
         Group {
-            if isAuthenticated && !hasExpired {
-                PatchProjectsView(
-                    onOpenSettings: { showSettings = true },
-                    onOpenLogs: { showLogs = true }
-                )
-                .tint(AppTheme.accent)
-                .sheet(isPresented: $showSettings) { SettingsView() }
-                .sheet(isPresented: $showLogs) { LogView() }
-                .patchStorePresentation(patchStore)
+            if horizontalSizeClass == .regular {
+                regularLayout
             } else {
-                ExternalLoginView(isExpired: hasExpired) {
-                    isAuthenticated = true
-                }
+                compactLayout
             }
         }
+        .tint(AppTheme.accent)
         .preferredColorScheme(.dark)
-        .onAppear { validateClock() }
+        .background(AppTheme.pageBackground.ignoresSafeArea())
+        .imageScale(.small)
+        .onChange(of: patchDraftCoordinator.request?.id) { requestID in
+            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
+        }
+        .onChange(of: patchDraftCoordinator.importRequest?.id) { requestID in
+            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
+        }
+        .onChange(of: developerModeEnabled) { _ in
+            tabNavigation.reconcileSelection(with: featureVisibility)
+        }
+        .onAppear {
+            tabNavigation.reconcileSelection(with: featureVisibility)
+        }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showLogs) { LogView() }
+        .patchStorePresentation(patchStore)
+        .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
+    }
+
+    // Keep the app focused on the Installed screen; hide all tab/navigation lists.
+    private var compactLayout: some View {
+        sectionContent(.installed)
+            .id(AppSection.installed.rawValue)
+    }
+
+    private var regularLayout: some View {
+        sectionContent(.installed)
+            .id(AppSection.installed.rawValue)
+    }
+
+    @ViewBuilder
+    private func sectionContent(_ section: AppSection) -> some View {
+        switch section {
+        case .home:
+            RepositoryHomeView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        case .new:
+            RepositoryNewView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        case .sources:
+            RepositorySourcesView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        case .installed:
+            PatchProjectsView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        case .files:
+            AppDataBrowserView(
+                tabSession: filesTabSession,
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        case .search:
+            RepositorySearchView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        }
+    }
+
+    private var tabSelection: Binding<Int> {
+        Binding(
+            get: { tabNavigation.selectedTab },
+            set: { tabNavigation.select($0) }
+        )
+    }
+
+    private var filesTabSession: Binding<FilesTabSession> {
+        Binding(
+            get: { tabNavigation.filesTabs },
+            set: { tabNavigation.setFilesTabs($0) }
+        )
+    }
+
+    private var featureVisibility: FeatureVisibility {
+        FeatureVisibility(developerModeEnabled: developerModeActive)
+    }
+
+    private var developerModeActive: Bool {
+#if targetEnvironment(simulator)
+        developerModeEnabled
+            || ProcessInfo.processInfo.arguments.contains("--simulate-developer-mode")
+            || ProcessInfo.processInfo.arguments.contains("--simulate-files-tab")
+#else
+        developerModeEnabled
+#endif
+    }
+
+    private var selectedVisibleSection: AppSection {
+        let selected = AppSection(rawValue: tabNavigation.selectedTab)
+        return selected.flatMap {
+            featureVisibility.isVisible($0) ? $0 : nil
+        } ?? .home
+    }
+
+    private func openSettings() {
+        showSettings = true
+    }
+
+    private func openLogs() {
+        showLogs = true
     }
 }
 
-private struct ExternalLoginView: View {
-    let isExpired: Bool
-    let onLogin: () -> Void
+private struct CompactTabLabel: View {
+    let title: String
+    let systemImage: String
 
-    @State private var password = ""
-    @State private var errorMessage: String?
-
+    @ViewBuilder
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(red: 0.025, green: 0.025, blue: 0.035), Color(red: 0.16, green: 0.015, blue: 0.025), .black],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ).ignoresSafeArea()
+        if let image = UIImage(
+            systemName: systemImage,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+        )?.withRenderingMode(.alwaysTemplate) {
+            Image(uiImage: image)
+        } else {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .medium))
+        }
+        Text(title)
+    }
+}
 
-            VStack(spacing: 22) {
-                Spacer()
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 42, weight: .medium))
-                    .foregroundStyle(.white)
-                    .shadow(color: .red.opacity(0.65), radius: 14)
-                Text("EXTERNAL")
-                    .font(.system(size: 32, weight: .black, design: .rounded))
-                    .tracking(3)
-                    .foregroundStyle(Color(red: 1, green: 0.15, blue: 0.19))
-                Text("ENTRAR NA SUA CONTA")
-                    .font(.system(size: 12, weight: .bold))
-                    .tracking(2)
-                    .foregroundStyle(.white.opacity(0.72))
+private extension AppSection {
+    var titleKey: String {
+        switch self {
+        case .home: return "tab.home"
+        case .new: return "tab.new"
+        case .sources: return "tab.sources"
+        case .installed: return "tab.installed"
+        case .files: return "tab.files"
+        case .search: return "tab.search"
+        }
+    }
 
-                VStack(spacing: 14) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "lock.fill").foregroundStyle(.red)
-                        SecureField("Senha", text: $password)
-                    }
-                    .padding(15)
-                    .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13))
-                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.12), lineWidth: 1))
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.center)
-                    }
-
-                    Button {
-                        if isExpired {
-                            errorMessage = "Não foi possível validar o acesso."
-                        } else if password == "external123" {
-                            onLogin()
-                        } else {
-                            errorMessage = "Senha incorreta."
-                        }
-                    } label: {
-                        HStack {
-                            Text("ENTRAR")
-                            Spacer()
-                            Image(systemName: "arrow.right")
-                        }
-                        .font(.system(size: 14, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(.white)
-                        .padding(17)
-                        .background(LinearGradient(colors: [.red, Color(red: 0.55, green: 0.01, blue: 0.05)], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 13))
-                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(.white.opacity(0.18), lineWidth: 1))
-                        .shadow(color: .red.opacity(0.28), radius: 12, y: 5)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(20)
-                .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 20))
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(.red.opacity(0.28), lineWidth: 1))
-
-                Spacer()
-                Text("© Teus ios")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.red)
-                    .padding(.bottom, 12)
-            }
-            .padding(.horizontal, 26)
+    var systemImage: String {
+        switch self {
+        case .home: return "house.fill"
+        case .new: return "clock.fill"
+        case .sources: return "shippingbox.fill"
+        case .installed: return "tray.full.fill"
+        case .files: return "folder.fill"
+        case .search: return "magnifyingglass"
         }
     }
 }

@@ -89,6 +89,7 @@ struct FileBrowserView: View {
                 prompt: language.text("browser.search_files"),
                 clearLabel: language.text("common.clear")
             )
+            Divider()
             List {
                 Section {
                     ForEach(filteredEntries) { entry in
@@ -99,13 +100,9 @@ struct FileBrowserView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(nil)
-                        .listRowBackground(Color.clear)
                 }
-                .listRowBackground(Color.clear)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
+            .listStyle(.insetGrouped)
             .environment(\.defaultMinListRowHeight, AppTheme.fileRowHeight)
             .scrollDismissesKeyboard(.interactively)
             .overlay {
@@ -250,10 +247,6 @@ struct FileBrowserView: View {
         }
         .sheet(isPresented: $isShowingImportPicker) {
             FileDocumentPicker(
-                // Importação aceita qualquer item de arquivo e permite selecionar vários
-                // de uma vez no seletor do iOS.
-                allowedContentTypes: [.item],
-                copiesSelectedDocument: true,
                 allowsMultipleSelection: true,
                 onSelection: { result in
                     log("filebrowser: import picker returned")
@@ -409,7 +402,6 @@ struct FileBrowserView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
-            .listRowBackground(Color.clear)
         } else if entry.isDirectory {
             NavigationLink(
                 value: FileBrowserDestination(
@@ -423,17 +415,15 @@ struct FileBrowserView: View {
             }
             .contextMenu { fileActions(for: entry) }
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
-            .listRowBackground(Color.clear)
         } else {
-            // Files are intentionally non-navigable: tapping a file must not
-            // launch the previous/legacy preview application. File actions
-            // remain available through the context menu.
-            FileEntryRow(entry: entry, language: language, selectionState: nil)
-                .contentShape(Rectangle())
-                .contextMenu { fileActions(for: entry) }
-                .accessibilityHint(language.text("browser.file_actions_hint"))
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
-            .listRowBackground(Color.clear)
+            NavigationLink {
+                FileQuickLookView(file: entry)
+            } label: {
+                FileEntryRow(entry: entry, language: language, selectionState: nil)
+            }
+            .contextMenu { fileActions(for: entry) }
+            .accessibilityHint(language.text("browser.file_actions_hint"))
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         }
     }
 

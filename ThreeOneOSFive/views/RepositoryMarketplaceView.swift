@@ -389,7 +389,7 @@ struct RepositoryPackageDetailView: View {
                 .padding(.bottom, 32)
             }
             .scrollIndicators(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(AppTheme.pageBackground)
             .onAppear {
                 scrollToInformationIfNeeded(using: proxy)
             }

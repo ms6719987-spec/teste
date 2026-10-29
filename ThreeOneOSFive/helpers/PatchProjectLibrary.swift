@@ -57,36 +57,7 @@ enum PatchProjectLibrary {
         return root
     }
 
-    private static let bundledSeedMarker = ".bundled-seeds-v1"
-
-    private static func seedBundledPackagesIfNeeded(fileManager: FileManager) {
-        guard let root = try? packageRootURL(fileManager: fileManager) else { return }
-        let marker = root.appendingPathComponent(bundledSeedMarker)
-        guard !fileManager.fileExists(atPath: marker.path) else { return }
-
-        let bundledURLs = Bundle.main.urls(
-            forResourcesWithExtension: "3105",
-            subdirectory: "SeedPatches"
-        ) ?? []
-
-        for sourceURL in bundledURLs {
-            let destination = root.appendingPathComponent(sourceURL.lastPathComponent)
-            guard !fileManager.fileExists(atPath: destination.path) else { continue }
-            do {
-                try fileManager.copyItem(at: sourceURL, to: destination)
-            } catch {
-                log("patch: bundled seed import failed for \(sourceURL.lastPathComponent)")
-            }
-        }
-
-        try? Data("1".utf8).write(
-            to: marker,
-            options: [.atomic, .completeFileProtection]
-        )
-    }
-
     static func load(fileManager: FileManager = .default) -> [PatchLibraryItem] {
-        seedBundledPackagesIfNeeded(fileManager: fileManager)
         guard let root = try? packageRootURL(fileManager: fileManager),
               let urls = try? fileManager.contentsOfDirectory(
                 at: root,
@@ -94,9 +65,7 @@ enum PatchProjectLibrary {
                 options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
               ) else { return [] }
 
-        // Keep every physical package. packageID is a logical project identifier
-        // and must not make another .3105 file disappear from the library.
-        var loadedItems: [String: PatchLibraryItem] = [:]
+        var byID: [UUID: PatchLibraryItem] = [:]
         for url in urls where url.pathExtension.lowercased() == "3105" {
             do {
                 let data = try readPackage(at: url)
@@ -141,20 +110,13 @@ enum PatchProjectLibrary {
                         )
                     }
                 }
-                loadedItems[url.path] = item
+                byID[summary.packageID] = item
             } catch {
                 log("patch: skipped invalid local package \(url.lastPathComponent)")
             }
         }
-        return loadedItems.values.sorted {
-            let lhsDate = $0.project?.updatedAt ?? .distantPast
-            let rhsDate = $1.project?.updatedAt ?? .distantPast
-            if lhsDate != rhsDate {
-                return lhsDate > rhsDate
-            }
-            return $0.packageURL.lastPathComponent.localizedStandardCompare(
-                $1.packageURL.lastPathComponent
-            ) == .orderedAscending
+        return byID.values.sorted {
+            ($0.project?.updatedAt ?? .distantPast) > ($1.project?.updatedAt ?? .distantPast)
         }
     }
 
@@ -248,12 +210,16 @@ enum PatchProjectLibrary {
             packageID: summary.packageID,
             fileManager: fileManager
         )
-        // Multiple patch projects may target the same path. They are allowed
-        // to coexist in the library; the transaction layer still prevents two
-        // different projects from being active on the same target at once.
-        // This is important when several replacement files/variants share the
-        // same game asset directory or target and the user wants to keep them
-        // available for selection.
+        if let occupiedPath = overlappingTargetPath(
+            in: decoded.project,
+            excludingPackageID: summary.packageID,
+            fileManager: fileManager
+        ) {
+            if decoded.project.isPrivate, !authorCopy {
+                throw PatchPackageError.privateOperationFailed
+            }
+            throw PatchPackageError.targetOccupied(occupiedPath)
+        }
         let previousData = try existingURL.map { try readPackage(at: $0) }
         let originURL = try originFileURL(
             packageID: summary.packageID,
