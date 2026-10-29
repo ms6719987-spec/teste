@@ -14,72 +14,79 @@ struct ContentView: View {
     @State private var showLogs = false
 
     init() {
-#if targetEnvironment(simulator)
-        let arguments = ProcessInfo.processInfo.arguments
-        let initialTab: Int
-        if arguments.contains("--simulate-new-tab") {
-            initialTab = 1
-        } else if arguments.contains("--simulate-sources-tab") {
-            initialTab = 2
-        } else if arguments.contains("--simulate-installed-tab")
-                    || arguments.contains("--simulate-patch-tab")
-                    || arguments.contains("--simulate-wallpaper-tab") {
-            initialTab = 3
-        } else if arguments.contains("--simulate-files-tab") {
-            initialTab = 4
-        } else {
-            initialTab = 0
-        }
-        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: initialTab))
-        _showSettings = State(
-            initialValue: arguments.contains("--simulate-settings")
+        _tabNavigation = State(
+            initialValue: AppTabNavigationState(selectedTab: AppSection.installed.rawValue)
         )
-#else
-        _tabNavigation = State(initialValue: AppTabNavigationState())
+#if targetEnvironment(simulator)
+        _showSettings = State(
+            initialValue: ProcessInfo.processInfo.arguments.contains("--simulate-settings")
+        )
 #endif
     }
 
     var body: some View {
-        Group {
-            if horizontalSizeClass == .regular {
-                regularLayout
-            } else {
-                compactLayout
+        sectionContent(.installed)
+            .tint(AppTheme.accent)
+            .imageScale(.small)
+            .onChange(of: patchDraftCoordinator.request?.id) { requestID in
+                if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
             }
-        }
-        .tint(AppTheme.accent)
-        .preferredColorScheme(.dark)
-        .imageScale(.small)
-        .onChange(of: patchDraftCoordinator.request?.id) { requestID in
-            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
-        }
-        .onChange(of: patchDraftCoordinator.importRequest?.id) { requestID in
-            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
-        }
-        .onChange(of: developerModeEnabled) { _ in
-            tabNavigation.reconcileSelection(with: featureVisibility)
-        }
-        .onAppear {
-            tabNavigation.reconcileSelection(with: featureVisibility)
-        }
-        .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showLogs) { LogView() }
-        .patchStorePresentation(patchStore)
-        .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
+            .onChange(of: patchDraftCoordinator.importRequest?.id) { requestID in
+                if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
+            }
+            .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showLogs) { LogView() }
+            .patchStorePresentation(patchStore)
+            .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
     }
 
     private var compactLayout: some View {
-        PatchProjectsView(
-            onOpenSettings: openSettings,
-            onOpenLogs: openLogs
-        )
+        TabView(selection: tabSelection) {
+            ForEach(featureVisibility.visibleSections) { section in
+                sectionContent(section)
+                    .tabItem {
+                        CompactTabLabel(
+                            title: language.text(section.titleKey),
+                            systemImage: section.systemImage
+                        )
+                    }
+                    .tag(section.rawValue)
+            }
+        }
     }
 
     private var regularLayout: some View {
-        PatchProjectsView(
-            onOpenSettings: openSettings,
-            onOpenLogs: openLogs
-        )
+        NavigationSplitView {
+            List {
+                ForEach(featureVisibility.visibleSections) { section in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            tabNavigation.select(section.rawValue)
+                        }
+                    } label: {
+                        Label(language.text(section.titleKey), systemImage: section.systemImage)
+                            .fontWeight(section.rawValue == tabNavigation.selectedTab ? .semibold : .regular)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(
+                        section.rawValue == tabNavigation.selectedTab
+                            ? AppTheme.accent.opacity(0.14)
+                            : Color.clear
+                    )
+                    .accessibilityAddTraits(
+                        section.rawValue == tabNavigation.selectedTab ? .isSelected : []
+                    )
+                }
+            }
+            .navigationTitle("3105")
+            .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
+        } detail: {
+            sectionContent(selectedVisibleSection)
+                .id(selectedVisibleSection.rawValue)
+        }
+        .navigationSplitViewStyle(.balanced)
     }
 
     @ViewBuilder

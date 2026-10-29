@@ -426,15 +426,10 @@ struct PatchProjectsView: View {
             }
             .buttonStyle(.plain)
         } else {
-            HStack(spacing: 10) {
-                NavigationLink {
-                    PatchProjectDetailView(store: store, projectID: item.id)
-                } label: {
-                    PatchProjectRow(item: item, language: language)
-                }
-                .buttonStyle(.plain)
-
-                PatchActivationToggle(item: item)
+            NavigationLink {
+                PatchProjectDetailView(store: store, projectID: item.id)
+            } label: {
+                PatchProjectRow(item: item, language: language)
             }
         }
     }
@@ -490,24 +485,6 @@ private struct WallpaperImportFeedback: Identifiable {
     let id = UUID()
     let titleKey: String
     let message: String
-}
-
-
-private struct PatchActivationToggle: View {
-    let item: PatchLibraryItem
-    @AppStorage private var isActive: Bool
-
-    init(item: PatchLibraryItem) {
-        self.item = item
-        self._isActive = AppStorage(wrappedValue: false, "installed.patch.active.\(item.id.uuidString)")
-    }
-
-    var body: some View {
-        Toggle("Ativo", isOn: $isActive)
-            .labelsHidden()
-            .accessibilityLabel("Ativar arquivo \(item.project?.name ?? item.packageURL.lastPathComponent)")
-            .accessibilityHint("Alterna o estado de ativação deste arquivo")
-    }
 }
 
 private struct PatchProjectRow: View {

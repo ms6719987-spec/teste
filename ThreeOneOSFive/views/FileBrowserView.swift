@@ -32,6 +32,7 @@ struct FileBrowserView: View {
     @State private var importConflict: FileImportConflict?
     @State private var isSelecting = false
     @State private var selectedEntryIDs = Set<String>()
+    @State private var enabledFilePaths = Set<String>()
     @State private var transferSession: FileTransferSession?
     @State private var transferConflict: FileTransferConflict?
     @State private var deleteTargets: [FileEntry] = []
@@ -401,7 +402,8 @@ struct FileBrowserView: View {
                 )
             }
             .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 10))
+            .listRowBackground(Color.black.opacity(0.30))
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         } else if entry.isDirectory {
             NavigationLink(
                 value: FileBrowserDestination(
@@ -414,13 +416,31 @@ struct FileBrowserView: View {
                 FileEntryRow(entry: entry, language: language, selectionState: nil)
             }
             .contextMenu { fileActions(for: entry) }
-            .listRowInsets(EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 10))
+            .listRowBackground(Color.black.opacity(0.30))
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         } else {
-            // Arquivos são apenas exibidos na lista; tocar neles não abre a pré-visualização.
-            FileEntryRow(entry: entry, language: language, selectionState: nil)
-                .contentShape(Rectangle())
-                .contextMenu { fileActions(for: entry) }
-                .listRowInsets(EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 10))
+            HStack(spacing: 12) {
+                FileEntryRow(entry: entry, language: language, selectionState: nil)
+                Spacer(minLength: 8)
+                Toggle(
+                    "Ativar \(entry.name)",
+                    isOn: Binding(
+                        get: { enabledFilePaths.contains(entry.path) },
+                        set: { isEnabled in
+                            if isEnabled {
+                                enabledFilePaths.insert(entry.path)
+                            } else {
+                                enabledFilePaths.remove(entry.path)
+                            }
+                        }
+                    )
+                )
+                .labelsHidden()
+                .accessibilityLabel("Ativar \(entry.name)")
+            }
+            .contextMenu { fileActions(for: entry) }
+            .listRowBackground(Color.black.opacity(0.30))
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
         }
     }
 
@@ -1530,7 +1550,7 @@ private struct FileEntryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 11) {
             AppRowIcon(
                 systemName: symbol,
                 tint: tint,
@@ -1538,13 +1558,13 @@ private struct FileEntryRow: View {
                 frameSize: AppTheme.fileRowIconFrame
             )
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(entry.name)
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     .truncationMode(.middle)
                 Text(detailText)
-                    .font(.system(size: 10))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
