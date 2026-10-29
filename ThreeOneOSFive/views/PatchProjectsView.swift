@@ -18,9 +18,6 @@ struct PatchProjectsView: View {
     @EnvironmentObject private var draftCoordinator: PatchDraftCoordinator
     @EnvironmentObject private var store: PatchProjectStore
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
-    @AppStorage("installed.activePackageIDs") private var activePackageIDsRaw = ""
-    @State private var togglingPackageIDs: Set<String> = []
-    @State private var actionAlert: PatchStoreAlert?
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
@@ -93,6 +90,12 @@ struct PatchProjectsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                AppSearchField(
+                    text: $searchText,
+                    prompt: language.text("installed.search"),
+                    clearLabel: language.text("common.clear")
+                )
+                Divider()
                 List {
                     if !hasLocalContent && (store.isBusy || isImportingWallpapers) {
                         loadingState
@@ -108,7 +111,6 @@ struct PatchProjectsView: View {
                             Section(language.text("patch.title")) {
                                 ForEach(filteredItems) { item in
                                     itemRow(item)
-                                        .listRowBackground(AppTheme.consoleBackground.opacity(0.72))
                                 }
                                 .onDelete { offsets in
                                     offsets.map { filteredItems[$0] }.forEach(store.delete)
@@ -118,8 +120,14 @@ struct PatchProjectsView: View {
                         if !filteredWallpaperPackages.isEmpty {
                             Section(language.text("tab.wallpapers")) {
                                 ForEach(filteredWallpaperPackages) { package in
-                                    wallpaperRow(package)
-                                    .listRowBackground(AppTheme.consoleBackground.opacity(0.72))
+                                    NavigationLink {
+                                        InstalledWallpaperPackageDetailView(
+                                            package: package,
+                                            onApplied: reloadWallpaperPackages
+                                        )
+                                    } label: {
+                                        wallpaperRow(package)
+                                    }
                                     .swipeActions(
                                         edge: .trailing,
                                         allowsFullSwipe: false
@@ -140,16 +148,12 @@ struct PatchProjectsView: View {
                     if cleanerEnabled {
                         Section(language.text("repository.utilities")) {
                             cleanerRow
-                                .listRowBackground(AppTheme.consoleBackground.opacity(0.72))
                         }
                     }
                 }
                 .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .background(AppTheme.pageBackground)
             }
-            .background(AppTheme.pageBackground.ignoresSafeArea())
-            .navigationTitle("")
+            .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -263,13 +267,6 @@ struct PatchProjectsView: View {
                         deleteWallpaperPackage(package)
                     },
                     secondaryButton: .cancel(Text(language.text("common.cancel")))
-                )
-            }
-            .alert(item: $actionAlert) { alert in
-                Alert(
-                    title: Text(language.text(alert.titleKey)),
-                    message: Text(alert.message(language: language)),
-                    dismissButton: .default(Text(language.text("common.ok")))
                 )
             }
             .onAppear {
@@ -423,81 +420,16 @@ struct PatchProjectsView: View {
 
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem) -> some View {
-        HStack(spacing: 12) {
-            Group {
-                if item.isLocked {
-                    Button { store.requestUnlock(for: item) } label: {
-                        PatchProjectRow(item: item, language: language)
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    PatchProjectRow(item: item, language: language)
-                        .contentShape(Rectangle())
-                        .accessibilityHint(language.text("patch.apply"))
-                }
+        if item.isLocked {
+            Button { store.requestUnlock(for: item) } label: {
+                PatchProjectRow(item: item, language: language)
             }
-            if !item.isLocked {
-                Toggle(
-                    language.text("patch.apply"),
-                    isOn: activeBinding(for: item)
-                )
-                .labelsHidden()
-                .disabled(togglingPackageIDs.contains(item.id.uuidString))
-                .accessibilityLabel(language.text("patch.apply"))
-            }
-        }
-    }
-
-    private func activeBinding(for item: PatchLibraryItem) -> Binding<Bool> {
-        Binding(
-            get: { activePackageIDs.contains(item.id.uuidString) },
-            set: { setPackageActive($0, item: item) }
-        )
-    }
-
-    private var activePackageIDs: Set<String> {
-        Set(activePackageIDsRaw.split(separator: ",").map(String.init))
-    }
-
-    private func setPackageActive(_ active: Bool, item: PatchLibraryItem) {
-        let id = item.id.uuidString
-        var ids = activePackageIDs
-        if active { ids.insert(id) } else { ids.remove(id) }
-        activePackageIDsRaw = ids.sorted().joined(separator: ",")
-        togglingPackageIDs.insert(id)
-
-        Task.detached(priority: .userInitiated) {
-            do {
-                if active {
-                    guard let project = item.project else {
-                        throw PatchPackageError.invalidProject
-                    }
-                    let projectToApply = item.summary.schemaVersion >= 2 && item.canInspectContents
-                        ? try PatchProjectLibrary.synchronizeWorkspace(item: item)
-                        : project
-                    _ = try DevicePatchService.apply(project: projectToApply)
-                } else if let receipt = DevicePatchService.latestReceipt(projectID: item.id) {
-                    try DevicePatchService.restore(receipt: receipt)
-                }
-                await MainActor.run {
-                    togglingPackageIDs.remove(id)
-                    store.reload()
-                    actionAlert = PatchStoreAlert(
-                        titleKey: "common.done",
-                        messageKey: active ? "patch.applied_message" : "patch.restored_message"
-                    )
-                }
-            } catch {
-                await MainActor.run {
-                    togglingPackageIDs.remove(id)
-                    var ids = activePackageIDs
-                    if active { ids.remove(id) } else { ids.insert(id) }
-                    activePackageIDsRaw = ids.sorted().joined(separator: ",")
-                    actionAlert = PatchStoreAlert(
-                        titleKey: "common.failed",
-                        messageKey: active ? "patch.error.apply" : "patch.error.restore"
-                    )
-                }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink {
+                PatchProjectDetailView(store: store, projectID: item.id)
+            } label: {
+                PatchProjectRow(item: item, language: language)
             }
         }
     }
