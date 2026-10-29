@@ -43,11 +43,16 @@ struct FeatureVisibility: Equatable {
     }
 
     var visibleSections: [AppSection] {
-        [.installed]
+        AppSection.allCases.filter(isVisible)
     }
 
     func isVisible(_ section: AppSection) -> Bool {
-        section == .installed
+        switch section {
+        case .files:
+            return developerModeEnabled
+        default:
+            return true
+        }
     }
 }
 
@@ -84,7 +89,7 @@ struct AppTabNavigationState: Equatable {
     mutating func reconcileSelection(with visibility: FeatureVisibility) {
         guard let selectedSection = AppSection(rawValue: selectedTab),
               visibility.isVisible(selectedSection) else {
-            selectedTab = AppSection.installed.rawValue
+            selectedTab = AppSection.home.rawValue
             return
         }
     }

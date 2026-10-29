@@ -15,12 +15,29 @@ struct ContentView: View {
 
     init() {
 #if targetEnvironment(simulator)
-        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: AppSection.installed.rawValue))
+        let arguments = ProcessInfo.processInfo.arguments
+        let initialTab: Int
+        if arguments.contains("--simulate-new-tab") {
+            initialTab = 1
+        } else if arguments.contains("--simulate-sources-tab") {
+            initialTab = 2
+        } else if arguments.contains("--simulate-installed-tab")
+                    || arguments.contains("--simulate-patch-tab")
+                    || arguments.contains("--simulate-wallpaper-tab") {
+            initialTab = 3
+        } else if arguments.contains("--simulate-files-tab") {
+            initialTab = 4
+        } else if arguments.contains("--simulate-search-tab") {
+            initialTab = 5
+        } else {
+            initialTab = 0
+        }
+        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: initialTab))
         _showSettings = State(
             initialValue: arguments.contains("--simulate-settings")
         )
 #else
-        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: AppSection.installed.rawValue))
+        _tabNavigation = State(initialValue: AppTabNavigationState())
 #endif
     }
 
@@ -170,7 +187,7 @@ struct ContentView: View {
         let selected = AppSection(rawValue: tabNavigation.selectedTab)
         return selected.flatMap {
             featureVisibility.isVisible($0) ? $0 : nil
-        } ?? .installed
+        } ?? .home
     }
 
     private func openSettings() {

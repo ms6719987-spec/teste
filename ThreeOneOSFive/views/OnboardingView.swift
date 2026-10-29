@@ -465,7 +465,24 @@ enum OnboardingStore {
     }
 
     static func shouldShow() -> Bool {
-        false
+#if targetEnvironment(simulator)
+        if ProcessInfo.processInfo.arguments.contains("--skip-onboarding") { return false }
+        if ProcessInfo.processInfo.arguments.contains("--reset-onboarding") { return true }
+#endif
+        let fp = currentFingerprint
+        if let stored = completedFingerprint, !stored.isEmpty {
+            return stored != fp
+        }
+        // Migration: old installs only have completedVersion
+        if let completed = completedVersion, !completed.isEmpty {
+            if completed == currentVersion {
+                // Same version, migrate silently — next overwrite will be detected via fingerprint
+                UserDefaults.standard.set(fp, forKey: completedFingerprintKey)
+                return false
+            }
+            return true
+        }
+        return true
     }
 
     static func markCompleted() {
