@@ -18,6 +18,8 @@ struct PatchProjectsView: View {
     @EnvironmentObject private var draftCoordinator: PatchDraftCoordinator
     @EnvironmentObject private var store: PatchProjectStore
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
+    @AppStorage("installed.activePackageIDs") private var activePackageIDsRaw = ""
+    @State private var togglingPackageIDs: Set<String> = []
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
@@ -29,8 +31,6 @@ struct PatchProjectsView: View {
     @State private var isImportingWallpapers = false
     @State private var showSimulatedWallpaperDetail = false
     @State private var simulatedWallpaperDetailGate = OneShotPresentationGate()
-    @State private var activeOverrides: [UUID: Bool] = [:]
-    @State private var activationMessage: String?
     let onOpenSettings: () -> Void
     let onOpenLogs: () -> Void
 
@@ -107,6 +107,7 @@ struct PatchProjectsView: View {
                             Section(language.text("patch.title")) {
                                 ForEach(filteredItems) { item in
                                     itemRow(item)
+                                        .listRowBackground(AppTheme.consoleBackground.opacity(0.72))
                                 }
                                 .onDelete { offsets in
                                     offsets.map { filteredItems[$0] }.forEach(store.delete)
@@ -116,14 +117,8 @@ struct PatchProjectsView: View {
                         if !filteredWallpaperPackages.isEmpty {
                             Section(language.text("tab.wallpapers")) {
                                 ForEach(filteredWallpaperPackages) { package in
-                                    NavigationLink {
-                                        InstalledWallpaperPackageDetailView(
-                                            package: package,
-                                            onApplied: reloadWallpaperPackages
-                                        )
-                                    } label: {
-                                        wallpaperRow(package)
-                                    }
+                                    wallpaperRow(package)
+                                    .listRowBackground(AppTheme.consoleBackground.opacity(0.72))
                                     .swipeActions(
                                         edge: .trailing,
                                         allowsFullSwipe: false
@@ -144,21 +139,17 @@ struct PatchProjectsView: View {
                     if cleanerEnabled {
                         Section(language.text("repository.utilities")) {
                             cleanerRow
+                                .listRowBackground(AppTheme.consoleBackground.opacity(0.72))
                         }
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(AppTheme.pageBackground)
             }
+            .background(AppTheme.pageBackground.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("External", isPresented: Binding(
-                get: { activationMessage != nil },
-                set: { if !$0 { activationMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) { activationMessage = nil }
-            } message: {
-                Text(activationMessage ?? "")
-            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
@@ -424,58 +415,80 @@ struct PatchProjectsView: View {
 
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem) -> some View {
-        HStack(spacing: 10) {
-            // File rows are display-only: tapping the row does not open the file.
-            PatchProjectRow(item: item, language: language)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+        HStack(spacing: 12) {
+            Group {
+                if item.isLocked {
+                    Button { store.requestUnlock(for: item) } label: {
+                        PatchProjectRow(item: item, language: language)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    PatchProjectRow(item: item, language: language)
+                        .contentShape(Rectangle())
+                        .accessibilityHint(language.text("patch.apply"))
+                }
+            }
             if !item.isLocked {
                 Toggle(
                     language.text("patch.apply"),
-                    isOn: Binding(
-                        get: {
-                            activeOverrides[item.id] ?? (DevicePatchService.latestReceipt(projectID: item.id) != nil)
-                        },
-                        set: { setPatchActive($0, for: item) }
-                    )
+                    isOn: activeBinding(for: item)
                 )
                 .labelsHidden()
-                .tint(AppTheme.accent)
-                .accessibilityLabel("Ativar arquivo \(item.project?.name ?? item.packageURL.lastPathComponent)")
-                .disabled(store.isBusy)
+                .disabled(togglingPackageIDs.contains(item.id.uuidString))
+                .accessibilityLabel(language.text("patch.apply"))
             }
         }
     }
 
-    private func setPatchActive(_ shouldActivate: Bool, for item: PatchLibraryItem) {
-        let currentlyActive = DevicePatchService.latestReceipt(projectID: item.id) != nil
-        guard shouldActivate != currentlyActive else {
-            activeOverrides[item.id] = currentlyActive
-            return
-        }
-        guard let baseProject = item.project else { return }
-        activeOverrides[item.id] = currentlyActive
+    private func activeBinding(for item: PatchLibraryItem) -> Binding<Bool> {
+        Binding(
+            get: { activePackageIDs.contains(item.id.uuidString) },
+            set: { setPackageActive($0, item: item) }
+        )
+    }
+
+    private var activePackageIDs: Set<String> {
+        Set(activePackageIDsRaw.split(separator: ",").map(String.init))
+    }
+
+    private func setPackageActive(_ active: Bool, item: PatchLibraryItem) {
+        let id = item.id.uuidString
+        var ids = activePackageIDs
+        if active { ids.insert(id) } else { ids.remove(id) }
+        activePackageIDsRaw = ids.sorted().joined(separator: ",")
+        togglingPackageIDs.insert(id)
+
         Task.detached(priority: .userInitiated) {
             do {
-                if shouldActivate {
-                    let project = item.summary.schemaVersion >= 2 && item.canInspectContents
+                if active {
+                    guard let project = item.project else {
+                        throw PatchPackageError.invalidPackage
+                    }
+                    let projectToApply = item.summary.schemaVersion >= 2 && item.canInspectContents
                         ? try PatchProjectLibrary.synchronizeWorkspace(item: item)
-                        : baseProject
-                    _ = try DevicePatchService.apply(project: project)
+                        : project
+                    _ = try DevicePatchService.apply(project: projectToApply)
                 } else if let receipt = DevicePatchService.latestReceipt(projectID: item.id) {
                     try DevicePatchService.restore(receipt: receipt)
                 }
                 await MainActor.run {
-                    activeOverrides[item.id] = shouldActivate
+                    togglingPackageIDs.remove(id)
                     store.reload()
-                    activationMessage = shouldActivate
-                        ? "Arquivo ativado com sucesso."
-                        : "Arquivo desativado com sucesso."
+                    actionAlert = PatchStoreAlert(
+                        titleKey: "common.done",
+                        messageKey: active ? "patch.applied_message" : "patch.restored_message"
+                    )
                 }
             } catch {
                 await MainActor.run {
-                    activeOverrides[item.id] = DevicePatchService.latestReceipt(projectID: item.id) != nil
-                    activationMessage = "Não foi possível \(shouldActivate ? "ativar" : "desativar") o arquivo. Abra os detalhes para ver as opções de correção."
+                    togglingPackageIDs.remove(id)
+                    var ids = activePackageIDs
+                    if active { ids.remove(id) } else { ids.insert(id) }
+                    activePackageIDsRaw = ids.sorted().joined(separator: ",")
+                    actionAlert = PatchStoreAlert(
+                        titleKey: "common.failed",
+                        messageKey: active ? "patch.error.apply" : "patch.error.restore"
+                    )
                 }
             }
         }

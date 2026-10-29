@@ -30,7 +30,7 @@ struct ContentView: View {
         } else if arguments.contains("--simulate-search-tab") {
             initialTab = 5
         } else {
-            initialTab = AppSection.installed.rawValue
+            initialTab = 0
         }
         _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: initialTab))
         _showSettings = State(
@@ -42,16 +42,8 @@ struct ContentView: View {
     }
 
     var body: some View {
-        Group {
-            if horizontalSizeClass == .regular {
-                regularLayout
-            } else {
-                compactLayout
-            }
-        }
+        sectionContent(.installed)
         .tint(AppTheme.accent)
-        .preferredColorScheme(.dark)
-        .background(AppTheme.pageBackground.ignoresSafeArea())
         .imageScale(.small)
         .onChange(of: patchDraftCoordinator.request?.id) { requestID in
             if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
@@ -71,15 +63,53 @@ struct ContentView: View {
         .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
     }
 
-    // Keep the app focused on the Installed screen; hide all tab/navigation lists.
     private var compactLayout: some View {
-        sectionContent(.installed)
-            .id(AppSection.installed.rawValue)
+        TabView(selection: tabSelection) {
+            ForEach(featureVisibility.visibleSections) { section in
+                sectionContent(section)
+                    .tabItem {
+                        CompactTabLabel(
+                            title: language.text(section.titleKey),
+                            systemImage: section.systemImage
+                        )
+                    }
+                    .tag(section.rawValue)
+            }
+        }
     }
 
     private var regularLayout: some View {
-        sectionContent(.installed)
-            .id(AppSection.installed.rawValue)
+        NavigationSplitView {
+            List {
+                ForEach(featureVisibility.visibleSections) { section in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            tabNavigation.select(section.rawValue)
+                        }
+                    } label: {
+                        Label(language.text(section.titleKey), systemImage: section.systemImage)
+                            .fontWeight(section.rawValue == tabNavigation.selectedTab ? .semibold : .regular)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(
+                        section.rawValue == tabNavigation.selectedTab
+                            ? AppTheme.accent.opacity(0.14)
+                            : Color.clear
+                    )
+                    .accessibilityAddTraits(
+                        section.rawValue == tabNavigation.selectedTab ? .isSelected : []
+                    )
+                }
+            }
+            .navigationTitle("3105")
+            .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
+        } detail: {
+            sectionContent(selectedVisibleSection)
+                .id(selectedVisibleSection.rawValue)
+        }
+        .navigationSplitViewStyle(.balanced)
     }
 
     @ViewBuilder

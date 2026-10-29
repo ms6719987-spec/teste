@@ -27,18 +27,12 @@ struct RepositoryHomeView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 32)
             }
-            .background(
-                LinearGradient(
-                    colors: [Color(red: 0.075, green: 0.025, blue: 0.040), AppTheme.pageBackground, AppTheme.pageBackground],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background(Color(uiColor: .systemGroupedBackground))
             .refreshable {
                 await store.refreshAllAndWait()
                 rebuildFeed()
             }
-            .navigationTitle("External")
+            .navigationTitle("3105")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 AppUtilityToolbar(

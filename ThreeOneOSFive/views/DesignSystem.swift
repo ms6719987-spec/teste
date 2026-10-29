@@ -1,10 +1,23 @@
 import SwiftUI
 
 enum AppTheme {
-    // External: visual identity in red and near-black, consistent in every section.
-    static let accent = Color(red: 1.00, green: 0.12, blue: 0.20)
-    static let pageBackground = Color(red: 0.035, green: 0.035, blue: 0.045)
-    static let consoleBackground = Color(red: 0.065, green: 0.065, blue: 0.080)
+    static let accent = Color(
+        uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 1.00, green: 0.12, blue: 0.18, alpha: 1.00)
+                : UIColor(red: 0.82, green: 0.02, blue: 0.08, alpha: 1.00)
+        }
+    )
+    static let pageBackground = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.025, green: 0.025, blue: 0.035, alpha: 1.00)
+            : UIColor(red: 0.055, green: 0.045, blue: 0.050, alpha: 1.00)
+    })
+    static let consoleBackground = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.055, green: 0.050, blue: 0.060, alpha: 0.92)
+            : UIColor(red: 0.075, green: 0.060, blue: 0.070, alpha: 0.92)
+    })
     static let pageInset: CGFloat = 16
     static let rowIconSize: CGFloat = 17
     static let rowIconFrame: CGFloat = 28
@@ -26,7 +39,7 @@ struct AppCardBorder: View {
             style: .continuous
         )
         .strokeBorder(
-            AppTheme.accent.opacity(0.20),
+            AppTheme.accent.opacity(0.16),
             lineWidth: 0.5
         )
         .accessibilityHidden(true)
@@ -85,7 +98,7 @@ struct AppSearchField: View {
         .padding(.horizontal, 11)
         .frame(minHeight: 36)
         .background(
-            Color(red: 0.10, green: 0.075, blue: 0.085),
+            Color(uiColor: .secondarySystemFill),
             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
         .padding(.horizontal, AppTheme.pageInset)
