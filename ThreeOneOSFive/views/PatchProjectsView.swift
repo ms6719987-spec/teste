@@ -470,7 +470,7 @@ struct PatchProjectsView: View {
             do {
                 if active {
                     guard let project = item.project else {
-                        throw PatchPackageError.invalidPackage
+                        throw PatchPackageError.invalidProject
                     }
                     let projectToApply = item.summary.schemaVersion >= 2 && item.canInspectContents
                         ? try PatchProjectLibrary.synchronizeWorkspace(item: item)
