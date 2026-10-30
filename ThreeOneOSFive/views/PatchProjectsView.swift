@@ -327,7 +327,7 @@ struct PatchProjectsView: View {
             .background(Color.clear)
             .safeAreaInset(edge: .bottom, spacing: 0) {
             }
-            .navigationTitle(language.text("tab.installed"))
+            .navigationTitle("INJETOR")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
