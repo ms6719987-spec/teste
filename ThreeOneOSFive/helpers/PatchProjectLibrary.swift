@@ -57,7 +57,36 @@ enum PatchProjectLibrary {
         return root
     }
 
+    private static let bundledSeedMarker = ".bundled-seeds-v1"
+
+    private static func seedBundledPackagesIfNeeded(fileManager: FileManager) {
+        guard let root = try? packageRootURL(fileManager: fileManager) else { return }
+        let marker = root.appendingPathComponent(bundledSeedMarker)
+        guard !fileManager.fileExists(atPath: marker.path) else { return }
+
+        let bundledURLs = Bundle.main.urls(
+            forResourcesWithExtension: "3105",
+            subdirectory: "SeedPatches"
+        ) ?? []
+
+        for sourceURL in bundledURLs {
+            let destination = root.appendingPathComponent(sourceURL.lastPathComponent)
+            guard !fileManager.fileExists(atPath: destination.path) else { continue }
+            do {
+                try fileManager.copyItem(at: sourceURL, to: destination)
+            } catch {
+                log("patch: bundled seed import failed for \(sourceURL.lastPathComponent)")
+            }
+        }
+
+        try? Data("1".utf8).write(
+            to: marker,
+            options: [.atomic, .completeFileProtection]
+        )
+    }
+
     static func load(fileManager: FileManager = .default) -> [PatchLibraryItem] {
+        seedBundledPackagesIfNeeded(fileManager: fileManager)
         guard let root = try? packageRootURL(fileManager: fileManager),
               let urls = try? fileManager.contentsOfDirectory(
                 at: root,
@@ -65,7 +94,7 @@ enum PatchProjectLibrary {
                 options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
               ) else { return [] }
 
-        var byID: [UUID: PatchLibraryItem] = [:]
+        var loadedItems: [String: PatchLibraryItem] = [:]
         for url in urls where url.pathExtension.lowercased() == "3105" {
             do {
                 let data = try readPackage(at: url)
@@ -110,13 +139,20 @@ enum PatchProjectLibrary {
                         )
                     }
                 }
-                byID[summary.packageID] = item
+                loadedItems[url.path] = item
             } catch {
                 log("patch: skipped invalid local package \(url.lastPathComponent)")
             }
         }
-        return byID.values.sorted {
-            ($0.project?.updatedAt ?? .distantPast) > ($1.project?.updatedAt ?? .distantPast)
+        return loadedItems.values.sorted {
+            let lhsDate = $0.project?.updatedAt ?? .distantPast
+            let rhsDate = $1.project?.updatedAt ?? .distantPast
+            if lhsDate != rhsDate {
+                return lhsDate > rhsDate
+            }
+            return $0.packageURL.lastPathComponent.localizedStandardCompare(
+                $1.packageURL.lastPathComponent
+            ) == .orderedAscending
         }
     }
 
@@ -210,16 +246,6 @@ enum PatchProjectLibrary {
             packageID: summary.packageID,
             fileManager: fileManager
         )
-        if let occupiedPath = overlappingTargetPath(
-            in: decoded.project,
-            excludingPackageID: summary.packageID,
-            fileManager: fileManager
-        ) {
-            if decoded.project.isPrivate, !authorCopy {
-                throw PatchPackageError.privateOperationFailed
-            }
-            throw PatchPackageError.targetOccupied(occupiedPath)
-        }
         let previousData = try existingURL.map { try readPackage(at: $0) }
         let originURL = try originFileURL(
             packageID: summary.packageID,

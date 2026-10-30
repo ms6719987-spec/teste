@@ -75,14 +75,14 @@
 "dashboard.kernel_inactive" = "Inactive";
 "dashboard.enterprise_signing" = "3105 only works when signed with an enterprise certificate. SideStore, AltStore, 3uTools and LiveContainer are not supported.";
 "dashboard.features" = "Features";
-"dashboard.features_footer" = "Turn on Cleaner or Wallpapers to show it in the app navigation.";
+"dashboard.features_footer" = "Turn on Lixo do sistema or Wallpapers to show it in the app navigation.";
 "tab.home" = "Home";
 "tab.new" = "New";
 "tab.files" = "Files";
 "tab.patches" = "Patches";
-"tab.cleaner" = "Cleaner";
+"tab.cleaner" = "Lixo do sistema";
 
-"cleaner.title" = "Cleaner";
+"cleaner.title" = "Lixo do sistema";
 "cleaner.limited_mode" = "Limited Cleanup";
 "cleaner.available" = "Available to clean";
 "cleaner.selected" = "Selected";
@@ -224,7 +224,7 @@
 "patch.error.replacement_required" = "Choose a replacement file for every target path before saving.";
 "patch.error.keychain" = "The remembered unlock key could not be saved or read securely.";
 "patch.error.app_unavailable" = "The app bundle %@ is not installed or cannot be opened. No patch files were changed.";
-"patch.error.target_occupied" = "The target %@ is already patched by another project. Restore that patch before applying this one.";
+"patch.error.target_occupied" = "The target %@ is already active in another project. Disable or restore that patch before applying this one.";
 "patch.error.already_applied" = "This patch is already active. Reset it or restore the originals before applying it again.";
 "patch.error.restore_targets_changed" = "These files changed after apply and require confirmation before restoration:\n%@";
 "patch.error.active_delete" = "This patch is still active. Restore its original files before deleting the package.";
@@ -491,7 +491,9 @@
 /* Repository marketplace */
 "tab.explore" = "Explore";
 "tab.sources" = "Sources";
-"tab.installed" = "Installed";
+"ios.compatible" = "Compatible";
+"ios.not_compatible" = "Not supported";
+"tab.installed" = "";
 "installed.search" = "Search patches or wallpapers";
 "installed.empty_title" = "Nothing Installed";
 "installed.empty_message" = "Import a .3105 patch or .tendies wallpaper package to begin.";
@@ -503,7 +505,7 @@
 "repository.sources" = "Sources";
 "repository.search" = "Search";
 "repository.built_in_tools" = "Built-in Tools";
-"repository.cleaner_subtitle" = "Review and remove app cache and temporary files.";
+"repository.cleaner_subtitle" = "Revise e remova cache e arquivos temporários.";
 "repository.wallpaper_subtitle" = "Import and manage PosterBoard wallpaper packages.";
 "repository.tools_disabled" = "Built-in tools are hidden.";
 "repository.tools_footer" = "Enable or hide these tools from Settings.";

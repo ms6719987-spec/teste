@@ -89,7 +89,6 @@ struct FileBrowserView: View {
                 prompt: language.text("browser.search_files"),
                 clearLabel: language.text("common.clear")
             )
-            Divider()
             List {
                 Section {
                     ForEach(filteredEntries) { entry in
@@ -100,9 +99,13 @@ struct FileBrowserView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(nil)
+                        .listRowBackground(Color.clear)
                 }
+                .listRowBackground(Color.clear)
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
             .environment(\.defaultMinListRowHeight, AppTheme.fileRowHeight)
             .scrollDismissesKeyboard(.interactively)
             .overlay {
@@ -247,6 +250,8 @@ struct FileBrowserView: View {
         }
         .sheet(isPresented: $isShowingImportPicker) {
             FileDocumentPicker(
+                allowedContentTypes: [.item],
+                copiesSelectedDocument: true,
                 allowsMultipleSelection: true,
                 onSelection: { result in
                     log("filebrowser: import picker returned")
@@ -402,6 +407,7 @@ struct FileBrowserView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowBackground(Color.clear)
         } else if entry.isDirectory {
             NavigationLink(
                 value: FileBrowserDestination(
@@ -415,15 +421,14 @@ struct FileBrowserView: View {
             }
             .contextMenu { fileActions(for: entry) }
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowBackground(Color.clear)
         } else {
-            NavigationLink {
-                FileQuickLookView(file: entry)
-            } label: {
-                FileEntryRow(entry: entry, language: language, selectionState: nil)
-            }
-            .contextMenu { fileActions(for: entry) }
-            .accessibilityHint(language.text("browser.file_actions_hint"))
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            FileEntryRow(entry: entry, language: language, selectionState: nil)
+                .contentShape(Rectangle())
+                .contextMenu { fileActions(for: entry) }
+                .accessibilityHint(language.text("browser.file_actions_hint"))
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowBackground(Color.clear)
         }
     }
 
@@ -1534,12 +1539,15 @@ private struct FileEntryRow: View {
 
     var body: some View {
         HStack(spacing: 11) {
-            AppRowIcon(
-                systemName: symbol,
-                tint: tint,
-                symbolSize: AppTheme.fileRowIconSize,
-                frameSize: AppTheme.fileRowIconFrame
-            )
+            ZStack {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.black)
+                Image(systemName: symbol)
+                    .font(.system(size: AppTheme.fileRowIconSize, weight: .medium))
+                    .foregroundStyle(tint)
+            }
+            .frame(width: AppTheme.fileRowIconFrame, height: AppTheme.fileRowIconFrame)
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.name)

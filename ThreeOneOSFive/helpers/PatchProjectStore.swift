@@ -349,7 +349,7 @@ final class PatchProjectStore: ObservableObject {
     }
 
     private func existingPackageURL(for packageID: UUID) -> URL? {
-        items.first(where: { $0.id == packageID })?.packageURL
+        return nil
     }
 
     private nonisolated static func persistImportedPackage(
@@ -425,8 +425,6 @@ final class PatchProjectStore: ObservableObject {
 
     private func failUnlock(_ error: PatchPackageError) {
         isBusy = false
-        // Keep the password sheet open so the user can retry.
-        // Presenting an alert while dismissing the sheet swallows the message.
         if case .invalidPasswordOrCorruptedPackage = error {
             unlockErrorKey = "patch.error.wrong_password"
         } else {

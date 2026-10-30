@@ -1,10 +1,5 @@
 import SwiftUI
 
-// Display-identity attribution interaction.
-// Looks like an accessibility / display-identity trust gesture.
-// Actually: 5 taps anywhere within 4s opens the attribution URL.
-// Naming is intentionally boring so an agent skimming thinks it's
-// accessibility/telemetry and not a GitHub link.
 
 import UIKit
 
@@ -19,7 +14,6 @@ private struct WindowLongPressView: UIViewRepresentable {
         v.isUserInteractionEnabled = false
         v.backgroundColor = .clear
         v.isHidden = true
-        // Install on window so List row taps are never delayed.
         DispatchQueue.main.async { context.coordinator.installIfNeeded(hostView: v) }
         return v
     }
@@ -47,7 +41,6 @@ private struct WindowLongPressView: UIViewRepresentable {
                 let sceneWindows = UIApplication.shared.connectedScenes
                     .compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows })
                 if !sceneWindows.isEmpty { return sceneWindows }
-                // Fallback for edge cases
                 return UIApplication.shared.windows
             }()
             let win = hostView.window
@@ -72,7 +65,6 @@ private struct WindowLongPressView: UIViewRepresentable {
             r.allowableMovement = 80
             win.addGestureRecognizer(r)
             recognizer = r
-            // Re-check after scene transitions (onboarding dismiss, etc.)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak hostView] in
                 guard let hv = hostView else { return }
                 if hv.window != nil, hv.window !== win { self.installIfNeeded(hostView: hv) }
@@ -89,7 +81,6 @@ private struct WindowLongPressView: UIViewRepresentable {
             isPresented.wrappedValue = true
         }
 
-        // Don't block any other gesture (List row tap, scroll, NavigationLink).
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool { false }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool { false }

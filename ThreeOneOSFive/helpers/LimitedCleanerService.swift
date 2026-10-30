@@ -1,6 +1,13 @@
 import Foundation
 import Darwin
 
+struct LimitedCleanerFileItem: Identifiable, Equatable {
+    let relativePath: String
+    let bytes: Int64
+
+    var id: String { relativePath }
+}
+
 struct LimitedCleanerUsage: Equatable {
     let cacheBytes: Int64
     let temporaryBytes: Int64
@@ -35,8 +42,6 @@ enum LimitedCleanerError: Error, Equatable {
 enum LimitedCleanerService {
     typealias ContainerRootValidator = (URL) -> Bool
 
-    /// This explicit allowlist is the product boundary. Do not add global `/var`
-    /// paths here: this cleaner is intentionally limited to per-app disposable data.
     static let allowedRelativeDirectories = ["Library/Caches", "tmp"]
 
     static func scan(
@@ -57,6 +62,31 @@ enum LimitedCleanerService {
                 temporaryBytes: temporary.bytes,
                 removableItemCount: cache.itemCount + temporary.itemCount
             )
+        }
+    }
+
+    static func scanItems(
+        containerURL: URL,
+        rootValidator: ContainerRootValidator
+    ) throws -> [LimitedCleanerFileItem] {
+        try withValidatedRootDescriptor(containerURL, rootValidator: rootValidator) { rootDescriptor in
+            var items: [LimitedCleanerFileItem] = []
+            collectItems(
+                components: ["Library", "Caches"],
+                displayPrefix: "Library/Caches",
+                rootDescriptor: rootDescriptor,
+                into: &items
+            )
+            collectItems(
+                components: ["tmp"],
+                displayPrefix: "tmp",
+                rootDescriptor: rootDescriptor,
+                into: &items
+            )
+            return items.sorted {
+                if $0.bytes != $1.bytes { return $0.bytes > $1.bytes }
+                return $0.relativePath.localizedCaseInsensitiveCompare($1.relativePath) == .orderedAscending
+            }
         }
     }
 
@@ -125,6 +155,59 @@ enum LimitedCleanerService {
         return scanDirectory(directoryDescriptor)
     }
 
+    private static func collectItems(
+        components: [String],
+        displayPrefix: String,
+        rootDescriptor: Int32,
+        into items: inout [LimitedCleanerFileItem]
+    ) {
+        guard let directoryDescriptor = openDirectory(
+            components: components,
+            relativeTo: rootDescriptor
+        ) else { return }
+        defer { close(directoryDescriptor) }
+        collectItems(
+            directoryDescriptor: directoryDescriptor,
+            relativePrefix: displayPrefix,
+            into: &items
+        )
+    }
+
+    private static func collectItems(
+        directoryDescriptor: Int32,
+        relativePrefix: String,
+        into items: inout [LimitedCleanerFileItem]
+    ) {
+        forEachEntry(in: directoryDescriptor) { name, information in
+            switch information.st_mode & S_IFMT {
+            case S_IFREG:
+                items.append(
+                    LimitedCleanerFileItem(
+                        relativePath: relativePrefix + "/" + name,
+                        bytes: max(0, Int64(information.st_size))
+                    )
+                )
+            case S_IFDIR:
+                let childDescriptor = name.withCString {
+                    openat(
+                        directoryDescriptor,
+                        $0,
+                        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
+                    )
+                }
+                guard childDescriptor >= 0 else { return }
+                collectItems(
+                    directoryDescriptor: childDescriptor,
+                    relativePrefix: relativePrefix + "/" + name,
+                    into: &items
+                )
+                close(childDescriptor)
+            default:
+                break
+            }
+        }
+    }
+
     private static func openDirectory(
         components: [String],
         relativeTo rootDescriptor: Int32
@@ -168,7 +251,6 @@ enum LimitedCleanerService {
                 result.bytes += nested.bytes
                 result.itemCount += nested.itemCount
             default:
-                // Symbolic links, sockets and device nodes are never followed or counted.
                 break
             }
         }
@@ -214,7 +296,6 @@ enum LimitedCleanerService {
                     summary.failedItemCount += 1
                 }
             default:
-                // Preserve and never follow symbolic links or special nodes.
                 break
             }
         }

@@ -325,18 +325,12 @@ struct PatchRuleEditorView: View {
                         HStack(spacing: 10) {
                             Image(systemName: replacementFilename.isEmpty ? "doc.badge.plus" : "doc.fill")
                                 .foregroundStyle(AppTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(replacementFilename.isEmpty
-                                     ? language.text("patch.choose_file")
-                                     : replacementFilename)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                                Text(language.text(replacementFilename.isEmpty
-                                     ? "patch.replacement_required"
-                                     : "patch.change_replacement"))
-                                    .font(.caption)
-                                    .foregroundStyle(replacementFilename.isEmpty ? Color.orange : Color.secondary)
-                            }
+                            Text(replacementFilename.isEmpty
+                                 ? language.text("patch.choose_file")
+                                 : replacementFilename)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption.weight(.semibold))
@@ -352,15 +346,6 @@ struct PatchRuleEditorView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                    if !replacementFilename.isEmpty {
-                        LabeledContent(
-                            language.text("patch.file_size"),
-                            value: ByteCountFormatter.string(
-                                fromByteCount: Int64(replacementData.count),
-                                countStyle: .file
-                            )
-                        )
                     }
                 }
 

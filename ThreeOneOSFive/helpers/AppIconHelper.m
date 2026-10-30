@@ -20,8 +20,6 @@ static NSData *iconDataFromProxy(id proxy) {
     SEL iconSel = NSSelectorFromString(@"iconDataForVariant:");
     if (![proxy respondsToSelector:iconSel]) return nil;
 
-    // Variant availability differs between iOS releases and app types.
-    // Stop at the first usable image instead of assuming variant zero exists.
     const int variants[] = {2, 0, 1, 3, 4, 5, 6, 7, 15};
     for (NSUInteger index = 0; index < sizeof(variants) / sizeof(variants[0]); index++) {
         id data = ((id (*)(id, SEL, int))objc_msgSend)(proxy, iconSel, variants[index]);
@@ -87,7 +85,6 @@ static NSDictionary *appsFromMobileInstallation(void) {
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
     void *frameworkHandle = mobileInstallationHandle();
 
-    // Legacy path for older releases where the original symbol is still exported.
     void *lookupFn = dlsym(RTLD_DEFAULT, "MobileInstallationLookup");
     if (!lookupFn && frameworkHandle) {
         lookupFn = dlsym(frameworkHandle, "MobileInstallationLookup");
@@ -232,7 +229,6 @@ NSDictionary<NSString *, NSDictionary *> *installedAppInfo(void) {
     return mobileInstallation;
 }
 
-// Icon via LSApplicationProxy (per bundle ID)
 UIImage *iconForBundleID(NSString *bundleID) {
     static NSCache<NSString *, UIImage *> *cache;
     static dispatch_once_t onceToken;
@@ -254,7 +250,6 @@ UIImage *iconForBundleID(NSString *bundleID) {
     return icon;
 }
 
-// Name + icon for a single bundle ID via LSApplicationProxy
 NSDictionary *appInfoForBundleID(NSString *bundleID) {
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
     result[@"name"] = bundleID;

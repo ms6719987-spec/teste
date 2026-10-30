@@ -200,8 +200,6 @@ struct RepositorySource: Codable, Identifiable, Hashable {
         id = try container.decode(UUID.self, forKey: .id)
         manifestURL = try container.decode(URL.self, forKey: .manifestURL)
         addedAt = try container.decode(Date.self, forKey: .addedAt)
-        // Sources are always active now. Decode the legacy flag only for
-        // backwards compatibility, then intentionally discard its value.
         _ = try container.decodeIfPresent(Bool.self, forKey: .isEnabled)
         isEnabled = true
     }

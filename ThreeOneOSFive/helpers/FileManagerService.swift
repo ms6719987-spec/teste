@@ -659,9 +659,6 @@ enum FileManagerService {
             try fileManager.moveItem(at: destinationURL, to: backup)
             do {
                 try fileManager.moveItem(at: sourceURL, to: destinationURL)
-                // Installing the requested item is the operation's commit point.
-                // A stale backup is safer than reporting a failed move after the
-                // source has already changed locations.
                 try? fileManager.removeItem(at: backup)
             } catch {
                 if !fileManager.fileExists(atPath: destinationURL.path) {

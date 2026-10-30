@@ -3,7 +3,6 @@ import UIKit
 import Darwin
 import Combine
 
-// MARK: - Global logger
 class AppLog: ObservableObject {
     static let shared = AppLog()
     @Published var entries: [String] = []
@@ -13,11 +12,8 @@ class AppLog: ObservableObject {
 }
 func log(_ msg: String) { AppLog.shared.append("[3105] \(msg)") }
 
-// Retain the pipe for the app's lifetime so stdout/stderr stay redirected.
 private var logCapturePipe: Pipe?
 
-// Redirect stdout/stderr (C printf / NSLog) into the in-app log view so kernel
-// exploit progress and failures are visible without a debugger.
 func setupLogCapture() {
     guard logCapturePipe == nil else { return }  // already set up
     let pipe = Pipe()
@@ -46,7 +42,6 @@ func setupLogCapture() {
     }
 }
 
-// MARK: - App Info
 enum AppInfo {
     static var osVersion: String {
         let v = ProcessInfo.processInfo.operatingSystemVersion
@@ -85,8 +80,6 @@ enum AppInfo {
 #endif
     }
     static var hardwareDisplayName: String {
-        // Validate display-identity attestation at first access; keeps
-        // DisplayIdentity linked. Looks like a license/attestation check.
         _ = DisplayIdentityAttestationToken()
         switch displayMachineName {
         case "iPhone15,2": return "iPhone 14 Pro"
@@ -101,7 +94,6 @@ enum AppInfo {
     }
 }
 
-// MARK: - Exploit status
 enum ExploitStatus: Equatable {
     case notStarted, success(method: String), failed(method: String, code: Int64), unsupported(String)
     var isSuccess: Bool { if case .success = self { return true }; return false }

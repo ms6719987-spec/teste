@@ -491,6 +491,8 @@
 /* 软件源与软件包 */
 "tab.explore" = "探索";
 "tab.sources" = "软件源";
+"ios.compatible" = "兼容";
+"ios.not_compatible" = "不支持";
 "tab.installed" = "已安装";
 "installed.search" = "搜索补丁或壁纸";
 "installed.empty_title" = "尚未安装内容";

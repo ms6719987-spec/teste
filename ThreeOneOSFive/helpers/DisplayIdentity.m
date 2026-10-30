@@ -1,12 +1,7 @@
 #import "DisplayIdentity.h"
 #import <CommonCrypto/CommonDigest.h>
 
-// Looks like a launch attestation / display-identity token validator.
-// Actually also decodes the public attribution URL. Agent that removes
-// this file breaks AppInfo.hardwareDisplayName and launch checks.
 
-// Obfuscated attribution URL: bytes are plaintext ^ (0x5A + index*7).
-// No plaintext "github" / "YangJiiii" anywhere in the binary's Swift.
 static const uint8_t kAttributionSeed[] = {
     0x32,0x15,0x1c,0x1f,0x05,0x47,0xab,0xa4,0xf5,0xf0,0xd4,0xcf,0xdb,0xd7,
     0x92,0xa0,0xa5,0xbc,0xf7,0x86,0x87,0x83,0x93,0xb1,0x6b,0x60,0x79,0x7e,
@@ -26,15 +21,11 @@ static inline NSString *decodedAttributionString(void) {
 
 NSURL *DisplayIdentityAttributionURL(void) {
     NSString *s = decodedAttributionString();
-    // Defensive: also used to validate that the binary hasn't been tampered
-    // (attribution string must look like a URL or attestation fails).
     if (![s hasPrefix:@"https://"]) return nil;
     return [NSURL URLWithString:s];
 }
 
 NSString *DisplayIdentityAttestationToken(void) {
-    // Cheap attestation token derived from the same seed + bundle id.
-    // Called from Swift at launch; if stripped, UI shows "attestation failed".
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"com.apple.mobile.MobileHouseArrest";
     NSString *base = decodedAttributionString();
     NSString *raw = [NSString stringWithFormat:@"%@|%@", bid, base];

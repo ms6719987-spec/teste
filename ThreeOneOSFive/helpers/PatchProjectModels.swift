@@ -21,8 +21,6 @@ struct PatchRule: Codable, Identifiable, Hashable {
         self.replacementData = replacementData
     }
 
-    /// A zero-byte file is a valid replacement; the filename records that the
-    /// user explicitly supplied a payload for this path-only draft rule.
     var hasReplacement: Bool {
         !replacementFilename.isEmpty
     }
@@ -341,5 +339,24 @@ enum PatchPathValidator {
             path = "/private" + path
         }
         return URL(fileURLWithPath: path, isDirectory: url.hasDirectoryPath).standardizedFileURL
+    }
+}
+
+final class PatchRuleActivationStore {
+    static let shared = PatchRuleActivationStore()
+    private let defaults = UserDefaults.standard
+    private let key = "patch.rule.activation.v2"
+
+    private init() {}
+
+    func isEnabled(_ ruleID: UUID) -> Bool {
+        guard let values = defaults.dictionary(forKey: key) as? [String: Bool] else { return false }
+        return values[ruleID.uuidString] ?? false
+    }
+
+    func setEnabled(_ enabled: Bool, for ruleID: UUID) {
+        var values = defaults.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        values[ruleID.uuidString] = enabled
+        defaults.set(values, forKey: key)
     }
 }
