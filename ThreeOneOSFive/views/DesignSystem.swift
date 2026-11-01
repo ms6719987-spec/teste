@@ -33,23 +33,9 @@ struct AppCardBorder: View {
 
 struct RainGlassBackground: View {
     var body: some View {
-        ZStack {
-            Color.black
-            RadialGradient(
-                colors: [AppTheme.accent.opacity(0.13), .clear],
-                center: .topTrailing,
-                startRadius: 8,
-                endRadius: 520
-            )
-            RadialGradient(
-                colors: [AppTheme.accent.opacity(0.07), .clear],
-                center: .bottomLeading,
-                startRadius: 8,
-                endRadius: 440
-            )
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
+        Color.black
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
     }
 }
 

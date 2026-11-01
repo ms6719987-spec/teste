@@ -25,34 +25,8 @@ private enum GameAssetFilter {
     static let freeFireMaxDirectory =
         "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar/assetindexer.YJ~2FW7EkU5pRkVg51NrKyx4LXid8~3D"
 
-    static let aimbotTarget = "Documents/Assembly-CSharp-patch.bytes"
-
-    static func ruleMatchesTarget(_ rule: PatchRule, target: String) -> Bool {
-        let relativePath = rule.relativePath
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let replacementFilename = rule.replacementFilename
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
-        if relativePath.caseInsensitiveCompare(target) == .orderedSame
-            || replacementFilename.caseInsensitiveCompare(target) == .orderedSame {
-            return true
-        }
-
-        let combinedPath = relativePath.isEmpty
-            ? replacementFilename
-            : relativePath + "/" + replacementFilename
-
-        return combinedPath.caseInsensitiveCompare(target) == .orderedSame
-            || combinedPath.localizedCaseInsensitiveContains(target + "/")
-    }
 }
 
-private enum PatchCategory: String, CaseIterable {
-    case hs = "HS"
-    case aimbot = "AIMBOT"
-}
 
 struct PatchProjectsView: View {
     @Environment(\.appLanguage) private var language
@@ -66,7 +40,6 @@ struct PatchProjectsView: View {
     @AppStorage("cleaner.lastFoundBytes") private var cleanerLastFoundBytes: Int = 0
     @State private var searchText = ""
     @State private var selectedGame: GameOption = .freeFire
-    @State private var selectedCategory: PatchCategory = .hs
     @State private var wallpaperPackages: [WallpaperStagedPackage] = []
     @State private var wallpaperImportFeedback: WallpaperImportFeedback?
     @State private var wallpaperPendingDeletion: WallpaperStagedPackage?
@@ -80,35 +53,6 @@ struct PatchProjectsView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let matchingItems = store.items.filter { item in
             guard let project = item.project, item.canInspectContents else { return false }
-
-            if selectedCategory == .aimbot {
-                let hasAimbotTarget = project.rules.contains { rule in
-                    GameAssetFilter.ruleMatchesTarget(
-                        rule,
-                        target: GameAssetFilter.aimbotTarget
-                    )
-                }
-                guard hasAimbotTarget else { return false }
-
-                guard !query.isEmpty else { return true }
-                if item.packageURL.lastPathComponent.localizedCaseInsensitiveContains(query) {
-                    return true
-                }
-                if project.name.localizedCaseInsensitiveContains(query)
-                    || project.author.localizedCaseInsensitiveContains(query) {
-                    return true
-                }
-                return project.allBundleIdentifiers.contains {
-                        $0.localizedCaseInsensitiveContains(query)
-                    }
-                    || project.directories.contains {
-                        $0.relativePath.localizedCaseInsensitiveContains(query)
-                    }
-                    || project.rules.contains {
-                        $0.relativePath.localizedCaseInsensitiveContains(query)
-                            || $0.replacementFilename.localizedCaseInsensitiveContains(query)
-                    }
-            }
 
             if selectedGame == .freeFire {
                 let targetPath = GameAssetFilter.freeFireDirectory
@@ -244,20 +188,28 @@ struct PatchProjectsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                RainGlassBackground()
+                Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
+                Image("HoodedIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 154, height: 154)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+                    .accessibilityLabel("Ícone de homem de capuz")
+
                 VStack(alignment: .leading, spacing: 8) {
                     iosCompatibilityCard
                 }
                 .padding(.horizontal, AppTheme.pageInset)
-                .padding(.top, 18)
+                .padding(.top, 8)
                 .padding(.bottom, 14)
 
                 HStack(spacing: 8) {
                     gameOptionButton(.freeFire)
                     gameOptionButton(.freeFireMax)
-                    categoryMenu
                 }
                 .padding(.horizontal, AppTheme.pageInset)
                 .padding(.bottom, 10)
@@ -327,8 +279,9 @@ struct PatchProjectsView: View {
             .background(Color.clear)
             .safeAreaInset(edge: .bottom, spacing: 0) {
             }
-            .navigationTitle("INJETOR")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
                     allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -436,44 +389,6 @@ struct PatchProjectsView: View {
                 consumeExternalImport()
             }
         }
-    }
-
-    private var categoryMenu: some View {
-        Menu {
-            ForEach(PatchCategory.allCases, id: \.self) { category in
-                Button {
-                    selectedCategory = category
-                } label: {
-                    HStack {
-                        Text(category.rawValue)
-                        if selectedCategory == category {
-                            Spacer()
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(AppTheme.accent)
-                .frame(width: 42, height: 38)
-                .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(Color.clear, lineWidth: 0)
-                }
-                .overlay(alignment: .topTrailing) {
-                    if selectedCategory != .hs {
-                        Circle()
-                            .fill(AppTheme.accent)
-                            .frame(width: 7, height: 7)
-                            .offset(x: -2, y: 2)
-                    }
-                }
-                .accessibilityLabel("Filtro de categoria")
-        }
-        .buttonStyle(.plain)
     }
 
     private func gameOptionButton(_ option: GameOption) -> some View {
@@ -701,15 +616,10 @@ struct PatchProjectsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(Color.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.black.opacity(0.90), lineWidth: 1.0)
-                }
-                .shadow(color: .black.opacity(0.24), radius: 10, y: 4)
+
             }
         }
-        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 7, leading: 18, bottom: 7, trailing: 16))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
     }
@@ -876,36 +786,11 @@ private struct PatchProjectRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(Color.black)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(Color.white.opacity(0.10), lineWidth: 1.0)
-                    }
-                if item.isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(AppTheme.accent)
-                } else {
-                    ZStack(alignment: .bottomTrailing) {
-                        Image(systemName: "doc.fill")
-                            .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(.white)
-
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(2)
-                            .background(
-                                Circle()
-                                    .fill(AppTheme.accent)
-                            )
-                            .offset(x: 4, y: 4)
-                    }
-                }
-            }
-            .frame(width: 38, height: 38)
+            Image("HoodedIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 46, height: 46)
+                .accessibilityHidden(true)
 
             Text(item.project?.name ?? language.text("patch.locked_project"))
                 .font(.body.weight(.semibold))
