@@ -196,26 +196,19 @@ struct PatchProjectsView: View {
                 Image("SkullIcon")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 112, height: 112)
+                    .frame(width: 88, height: 88)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
+                    .padding(.top, 12)
+                    .padding(.bottom, 16)
                     .accessibilityLabel("Ícone de caveira")
 
-                VStack(alignment: .leading, spacing: 8) {
-                    iosCompatibilityCard
-                }
-                .padding(.horizontal, AppTheme.pageInset)
-                .padding(.top, 8)
-                .padding(.bottom, 14)
-
-                HStack(spacing: 8) {
+                HStack(spacing: 9) {
                     gameOptionButton(.freeFire)
                     gameOptionButton(.freeFireMax)
                     gameOptionButton(.skins)
                 }
-                .padding(.horizontal, AppTheme.pageInset)
-                .padding(.bottom, 10)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 18)
 
                 List {
                     if !hasLocalContent && (store.isBusy || isImportingWallpapers) {
@@ -390,16 +383,37 @@ struct PatchProjectsView: View {
     }
 
     private func gameOptionButton(_ option: GameOption) -> some View {
-        Button {
+        let selected = selectedGame == option
+        let symbol: String = {
+            switch option {
+            case .freeFire, .freeFireMax: return "flame.fill"
+            case .skins: return "square.grid.2x2.fill"
+            }
+        }()
+        return Button {
             selectedGame = option
         } label: {
-            Text(option.rawValue)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selectedGame == option ? Color.white : .primary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 40)
-                .background(selectedGame == option ? AppTheme.accent.opacity(0.24) : Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                .shadow(color: selectedGame == option ? AppTheme.accent.opacity(0.32) : .clear, radius: 12)
+            VStack(spacing: 9) {
+                Image(systemName: symbol)
+                    .font(.system(size: 25, weight: .bold))
+                Text(option.rawValue)
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .tracking(0.8)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(selected ? Color.white : Color.white.opacity(0.72))
+            .frame(maxWidth: .infinity)
+            .frame(height: 88)
+            .background {
+                RoundedRectangle(cornerRadius: 23, style: .continuous)
+                    .fill(selected ? AppTheme.accent : Color(red: 0.035, green: 0.035, blue: 0.04))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 23, style: .continuous)
+                    .stroke(selected ? Color.red.opacity(0.95) : Color.red.opacity(0.30), lineWidth: selected ? 1.5 : 0.8)
+            }
+            .shadow(color: selected ? AppTheme.accent.opacity(0.48) : .clear, radius: 14, y: 0)
         }
         .buttonStyle(.plain)
     }
@@ -605,11 +619,19 @@ struct PatchProjectsView: View {
                     .fixedSize()
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color(red: 0.025, green: 0.025, blue: 0.03))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.clear, lineWidth: 0)
+                }
+                .shadow(color: AppTheme.accent.opacity(0.10), radius: 10, y: 0)
             }
         }
-        .listRowInsets(EdgeInsets(top: 7, leading: 18, bottom: 7, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
     }
@@ -779,7 +801,7 @@ private struct PatchProjectRow: View {
             Image("SkullIcon")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 38, height: 38)
+                .frame(width: 48, height: 48)
                 .accessibilityHidden(true)
 
             Text(item.project?.name ?? language.text("patch.locked_project"))
