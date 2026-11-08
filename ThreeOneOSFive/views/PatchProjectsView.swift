@@ -798,9 +798,9 @@ private struct PatchProjectRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image("SkullIcon")
-                .resizable()
-                .scaledToFit()
+            Image(systemName: "doc.fill")
+                .font(.system(size: 25, weight: .regular))
+                .foregroundStyle(.secondary)
                 .frame(width: 48, height: 48)
                 .accessibilityHidden(true)
 

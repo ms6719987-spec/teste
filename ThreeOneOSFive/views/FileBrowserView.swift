@@ -1539,9 +1539,9 @@ private struct FileEntryRow: View {
 
     var body: some View {
         HStack(spacing: 11) {
-            Image("SkullIcon")
-                .resizable()
-                .scaledToFit()
+            Image(systemName: entry.isDirectory ? "folder.fill" : "doc.fill")
+                .font(.system(size: AppTheme.fileRowIconFrame * 0.78, weight: .regular))
+                .foregroundStyle(.secondary)
                 .frame(width: AppTheme.fileRowIconFrame, height: AppTheme.fileRowIconFrame)
                 .accessibilityHidden(true)
 
