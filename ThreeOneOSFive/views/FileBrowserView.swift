@@ -1539,15 +1539,11 @@ private struct FileEntryRow: View {
 
     var body: some View {
         HStack(spacing: 11) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(Color.black)
-                Image(systemName: symbol)
-                    .font(.system(size: AppTheme.fileRowIconSize, weight: .medium))
-                    .foregroundStyle(tint)
-            }
-            .frame(width: AppTheme.fileRowIconFrame, height: AppTheme.fileRowIconFrame)
-            .accessibilityHidden(true)
+            Image("SkullIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: AppTheme.fileRowIconFrame, height: AppTheme.fileRowIconFrame)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.name)

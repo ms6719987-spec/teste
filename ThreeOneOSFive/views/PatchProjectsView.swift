@@ -14,8 +14,9 @@ private enum WallpaperPackagePickerPolicy {
 }
 
 private enum GameOption: String {
-    case freeFire = "Free Fire"
-    case freeFireMax = "Free Fire Max"
+    case freeFire = "FF NORMAL"
+    case freeFireMax = "FF MAX"
+    case skins = "SKINS / TEXTURAS"
 }
 
 private enum GameAssetFilter {
@@ -32,7 +33,6 @@ struct PatchProjectsView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var draftCoordinator: PatchDraftCoordinator
     @EnvironmentObject private var store: PatchProjectStore
-    @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
@@ -54,6 +54,7 @@ struct PatchProjectsView: View {
         let matchingItems = store.items.filter { item in
             guard let project = item.project, item.canInspectContents else { return false }
 
+            if selectedGame == .skins { return false }
             if selectedGame == .freeFire {
                 let targetPath = GameAssetFilter.freeFireDirectory
                 let hasFreeFireTarget = project.rules.contains { rule in
@@ -155,7 +156,8 @@ struct PatchProjectsView: View {
     }
 
     private var hasSearchResults: Bool {
-        !filteredItems.isEmpty || !filteredWallpaperPackages.isEmpty
+        if selectedGame == .skins { return !filteredWallpaperPackages.isEmpty }
+        return !filteredItems.isEmpty
     }
 
     private var currentIOSVersion: String {
@@ -191,14 +193,14 @@ struct PatchProjectsView: View {
                 Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                Image("HoodedIcon")
+                Image("SkullIcon")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 154, height: 154)
+                    .frame(width: 112, height: 112)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
+                    .padding(.top, 8)
                     .padding(.bottom, 8)
-                    .accessibilityLabel("Ícone de homem de capuz")
+                    .accessibilityLabel("Ícone de caveira")
 
                 VStack(alignment: .leading, spacing: 8) {
                     iosCompatibilityCard
@@ -210,6 +212,7 @@ struct PatchProjectsView: View {
                 HStack(spacing: 8) {
                     gameOptionButton(.freeFire)
                     gameOptionButton(.freeFireMax)
+                    gameOptionButton(.skins)
                 }
                 .padding(.horizontal, AppTheme.pageInset)
                 .padding(.bottom, 10)
@@ -235,7 +238,7 @@ struct PatchProjectsView: View {
                                 }
                             }
                         }
-                        if !filteredWallpaperPackages.isEmpty {
+                        if selectedGame == .skins && !filteredWallpaperPackages.isEmpty {
                             Section(language.text("tab.wallpapers")) {
                                 ForEach(filteredWallpaperPackages) { package in
                                     NavigationLink {
@@ -261,11 +264,6 @@ struct PatchProjectsView: View {
                                     }
                                 }
                             }
-                        }
-                    }
-                    if cleanerEnabled {
-                        Section {
-                            cleanerRow
                         }
                     }
                 }
@@ -400,15 +398,7 @@ struct PatchProjectsView: View {
                 .foregroundStyle(selectedGame == option ? Color.white : .primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
-                .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .fill(selectedGame == option ? AppTheme.accent.opacity(0.24) : Color.white.opacity(0.018))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .stroke(Color.clear, lineWidth: 0)
-                }
+                .background(selectedGame == option ? AppTheme.accent.opacity(0.24) : Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 .shadow(color: selectedGame == option ? AppTheme.accent.opacity(0.32) : .clear, radius: 12)
         }
         .buttonStyle(.plain)
@@ -786,10 +776,10 @@ private struct PatchProjectRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image("HoodedIcon")
+            Image("SkullIcon")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 46, height: 46)
+                .frame(width: 38, height: 38)
                 .accessibilityHidden(true)
 
             Text(item.project?.name ?? language.text("patch.locked_project"))
