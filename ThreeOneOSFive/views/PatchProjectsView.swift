@@ -598,12 +598,12 @@ struct PatchProjectsView: View {
                 Button {
                     store.requestUnlock(for: item)
                 } label: {
-                    PatchProjectRow(item: item, language: language)
+                    PatchProjectRow(item: item, language: language, subtitle: selectedGame.rawValue)
                 }
                 .buttonStyle(.plain)
             } else {
                 HStack(spacing: 12) {
-                    PatchProjectRow(item: item, language: language)
+                    PatchProjectRow(item: item, language: language, subtitle: selectedGame.rawValue)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     Toggle(
@@ -626,9 +626,10 @@ struct PatchProjectsView: View {
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.clear, lineWidth: 0)
+                        .stroke(Color.red.opacity(0.92), lineWidth: 1.25)
                 }
-                .shadow(color: AppTheme.accent.opacity(0.10), radius: 10, y: 0)
+                .shadow(color: Color.red.opacity(0.48), radius: 13, y: 0)
+                .shadow(color: Color.red.opacity(0.20), radius: 22, y: 0)
             }
         }
         .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
@@ -795,6 +796,7 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
+    let subtitle: String
 
     var body: some View {
         HStack(spacing: 12) {
@@ -804,10 +806,17 @@ private struct PatchProjectRow: View {
                 .frame(width: 48, height: 48)
                 .accessibilityHidden(true)
 
-            Text(item.project?.name ?? language.text("patch.locked_project"))
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(item.project?.name ?? language.text("patch.locked_project"))
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Text(subtitle)
+                    .font(.subheadline.weight(.heavy))
+                    .foregroundStyle(Color.red)
+                    .lineLimit(1)
+            }
 
             Spacer(minLength: 4)
         }
