@@ -2,8 +2,8 @@ import SwiftUI
 
 enum AppTheme {
     static let accent = Color(red: 0.92, green: 0.08, blue: 0.10)
-    static let pageBackground = Color.black
-    static let consoleBackground = Color(red: 0.025, green: 0.025, blue: 0.025)
+    static let pageBackground = Color(red: 0.055, green: 0.018, blue: 0.026)
+    static let consoleBackground = Color(red: 0.035, green: 0.012, blue: 0.018)
     static let pageInset: CGFloat = 16
     static let rowIconSize: CGFloat = 17
     static let rowIconFrame: CGFloat = 28
@@ -33,9 +33,35 @@ struct AppCardBorder: View {
 
 struct RainGlassBackground: View {
     var body: some View {
-        Color.black
-            .ignoresSafeArea()
-            .accessibilityHidden(true)
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.075, green: 0.018, blue: 0.030),
+                    Color(red: 0.030, green: 0.012, blue: 0.018),
+                    Color(red: 0.055, green: 0.014, blue: 0.022)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            RadialGradient(
+                colors: [
+                    AppTheme.accent.opacity(0.22),
+                    AppTheme.accent.opacity(0.07),
+                    .clear
+                ],
+                center: .top,
+                startRadius: 12,
+                endRadius: 420
+            )
+            RadialGradient(
+                colors: [AppTheme.accent.opacity(0.10), .clear],
+                center: .bottomTrailing,
+                startRadius: 8,
+                endRadius: 300
+            )
+        }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
     }
 }
 

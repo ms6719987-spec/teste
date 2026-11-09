@@ -193,14 +193,10 @@ struct PatchProjectsView: View {
                 Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                Image("SkullIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 88, height: 88)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 12)
-                    .padding(.bottom, 16)
-                    .accessibilityLabel("Ícone de caveira")
+                iosCompatibilityCard
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 14)
 
                 HStack(spacing: 9) {
                     gameOptionButton(.freeFire)
@@ -622,14 +618,8 @@ struct PatchProjectsView: View {
                 .padding(.vertical, 13)
                 .background(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color(red: 0.025, green: 0.025, blue: 0.03))
+                        .fill(Color.black)
                 )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.red.opacity(0.92), lineWidth: 1.25)
-                }
-                .shadow(color: Color.red.opacity(0.48), radius: 13, y: 0)
-                .shadow(color: Color.red.opacity(0.20), radius: 22, y: 0)
             }
         }
         .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
@@ -802,7 +792,8 @@ private struct PatchProjectRow: View {
         HStack(spacing: 12) {
             Image(systemName: "doc.fill")
                 .font(.system(size: 25, weight: .regular))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.red)
+                .shadow(color: Color.red.opacity(0.55), radius: 7, y: 0)
                 .frame(width: 48, height: 48)
                 .accessibilityHidden(true)
 
