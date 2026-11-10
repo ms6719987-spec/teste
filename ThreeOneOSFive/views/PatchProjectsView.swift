@@ -602,17 +602,19 @@ struct PatchProjectsView: View {
                     PatchProjectRow(item: item, language: language, subtitle: selectedGame.rawValue)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { DevicePatchService.latestReceipt(projectID: item.id) != nil },
-                            set: { enabled in setPatchActive(enabled, for: item) }
-                        )
-                    )
-                    .labelsHidden()
-                    .tint(AppTheme.accent)
-                    .scaleEffect(0.92)
-                    .fixedSize()
+                    let isActive = DevicePatchService.latestReceipt(projectID: item.id) != nil
+                    Button {
+                        setPatchActive(!isActive, for: item)
+                    } label: {
+                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 23, weight: .semibold))
+                            .foregroundStyle(isActive ? AppTheme.accent : Color.white.opacity(0.48))
+                                    .frame(width: 34, height: 34)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isActive ? "Desativar" : "Ativar")
+                    .accessibilityAddTraits(.isButton)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 13)
@@ -620,6 +622,10 @@ struct PatchProjectsView: View {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(Color.black)
                 )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                }
             }
         }
         .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
