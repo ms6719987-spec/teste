@@ -406,7 +406,7 @@ struct FileBrowserView: View {
                 )
             }
             .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 10))
             .listRowBackground(Color.clear)
         } else if entry.isDirectory {
             NavigationLink(
@@ -420,14 +420,14 @@ struct FileBrowserView: View {
                 FileEntryRow(entry: entry, language: language, selectionState: nil)
             }
             .contextMenu { fileActions(for: entry) }
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+            .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 10))
             .listRowBackground(Color.clear)
         } else {
             FileEntryRow(entry: entry, language: language, selectionState: nil)
                 .contentShape(Rectangle())
                 .contextMenu { fileActions(for: entry) }
                 .accessibilityHint(language.text("browser.file_actions_hint"))
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+                .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 10))
             .listRowBackground(Color.clear)
         }
     }
@@ -1538,14 +1538,14 @@ private struct FileEntryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 11) {
-            Image(systemName: entry.isDirectory ? "folder.fill" : "doc.fill")
-                .font(.system(size: AppTheme.fileRowIconFrame * 0.78, weight: .regular))
-                .foregroundStyle(.secondary)
+        HStack(spacing: 9) {
+            Image("SniperIcon")
+                .resizable()
+                .scaledToFit()
                 .frame(width: AppTheme.fileRowIconFrame, height: AppTheme.fileRowIconFrame)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)

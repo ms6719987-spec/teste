@@ -494,7 +494,7 @@
 "tab.explore" = "Explore";
 "tab.sources" = "Fontes";
 "ios.compatible" = "Compatível";
-"ios.not_compatible" = "Not supported";
+"ios.not_compatible" = "Não suportado";
 "tab.installed" = "";
 "installed.search" = "Pesquisar patches ou wallpapers";
 "installed.empty_title" = "Nothing Instalared";
@@ -671,3 +671,4 @@
 "settings.developer_mode_footer" = "Modo desenvolvedor adds Arquivos para o main navigation. Arquivos can browse e modify application containers.";
 "wallpaper.package_details" = "Detalhes do pacote";
 "wallpaper.package_arquivos" = "%lld arquivos";
+"ios.compatibility_status" = "Compatibilidade";

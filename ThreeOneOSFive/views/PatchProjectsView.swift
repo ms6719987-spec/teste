@@ -257,6 +257,7 @@ struct PatchProjectsView: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollDisabled(true)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
                 .listRowBackground(Color.clear)
@@ -434,40 +435,75 @@ struct PatchProjectsView: View {
     }
 
     private var iosCompatibilityCard: some View {
-        HStack(spacing: 10) {
-            Text("iOS \(currentIOSVersion)")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "iphone")
+                    .foregroundStyle(Color.red)
+                Text("INFORMAÇÕES DO DISPOSITIVO")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 0)
+            }
 
-            Text("•")
-                .foregroundStyle(.secondary)
+            Divider().overlay(Color.white.opacity(0.12))
 
-            HStack(spacing: 5) {
+            deviceInfoRow(
+                title: language.text("dashboard.hardware_model"),
+                value: AppInfo.hardwareDisplayName,
+                icon: "smartphone"
+            )
+
+            deviceInfoRow(
+                title: language.text("settings.ios_version"),
+                value: "iOS \\(currentIOSVersion)",
+                icon: "gear"
+            )
+
+            HStack(spacing: 7) {
                 Image(systemName: currentIOSIsSupported ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .foregroundStyle(currentIOSIsSupported ? .green : .red)
+                Text(language.text("ios.compatibility_status"))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
                 Text(currentIOSIsSupported
                      ? language.text("ios.compatible")
                      : language.text("ios.not_compatible"))
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(currentIOSIsSupported ? .green : .red)
             }
-
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.vertical, 12)
+        .background(Color(red: 0.045, green: 0.045, blue: 0.045), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.7)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "iOS \(currentIOSVersion), " +
+            "\\(AppInfo.hardwareDisplayName), iOS \\(currentIOSVersion), " +
             (currentIOSIsSupported
              ? language.text("ios.compatible")
              : language.text("ios.not_compatible"))
         )
+    }
+
+    private func deviceInfoRow(title: String, value: String, icon: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
     }
 
     private func sizeText(_ bytes: Int64) -> String {
