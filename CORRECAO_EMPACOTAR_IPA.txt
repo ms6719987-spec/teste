@@ -1,0 +1,16 @@
+ERRO CORRIGIDO: cp: .../build/Release-iphoneos/App.app: No such file or directory
+
+O projeto usa PRODUCT_NAME = 3105, portanto o caminho fixo App.app estava errado.
+
+No painel do serviço de build, SUBSTITUA o passo script "Empacotar IPA" por:
+
+  bash 3105-2.0/empacotar_ipa.sh
+
+Se o diretório de trabalho já for 3105-2.0, use:
+
+  bash empacotar_ipa.sh
+
+O script procura o .app gerado por build/archive e cria a IPA em output/ (ou CM_EXPORT_DIR).
+
+ATENCAO: não basta carregar o ZIP; o passo externo deve ser atualizado. O script não compila nem assina o app.
+Se nenhum .app existir, corrija a etapa de compilação anterior.
