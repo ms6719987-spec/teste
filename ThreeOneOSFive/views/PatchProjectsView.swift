@@ -13,33 +13,16 @@ private enum WallpaperPackagePickerPolicy {
     static let allowedContentTypes: [UTType] = [packageType, .data]
 }
 
-private enum GameOption: String {
-    case freeFire = "FF NORMAL"
-    case freeFireMax = "FF MAX"
-    case skins = "SKINS / TEXTURAS"
-}
-
-private enum GameAssetFilter {
-    static let freeFireDirectory =
-        "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar/assetindexer.U6Zffc4YIR3DslNj3cXvYGAqz58~3D"
-
-    static let freeFireMaxDirectory =
-        "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar/assetindexer.YJ~2FW7EkU5pRkVg51NrKyx4LXid8~3D"
-
-}
-
-
 struct PatchProjectsView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var draftCoordinator: PatchDraftCoordinator
     @EnvironmentObject private var store: PatchProjectStore
+    @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
-    @State private var isCleaningWithCard = false
-    @AppStorage("cleaner.lastFoundBytes") private var cleanerLastFoundBytes: Int = 0
+    @State private var showCleaner = false
     @State private var searchText = ""
-    @State private var selectedGame: GameOption = .freeFire
     @State private var wallpaperPackages: [WallpaperStagedPackage] = []
     @State private var wallpaperImportFeedback: WallpaperImportFeedback?
     @State private var wallpaperPendingDeletion: WallpaperStagedPackage?
@@ -51,64 +34,17 @@ struct PatchProjectsView: View {
 
     private var filteredItems: [PatchLibraryItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matchingItems = store.items.filter { item in
-            guard let project = item.project, item.canInspectContents else { return false }
-
-            if selectedGame == .skins { return false }
-            if selectedGame == .freeFire {
-                let targetPath = GameAssetFilter.freeFireDirectory
-                let hasFreeFireTarget = project.rules.contains { rule in
-                    let relativePath = rule.relativePath
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                    let replacementFilename = rule.replacementFilename
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
-                    if relativePath.caseInsensitiveCompare(targetPath) == .orderedSame {
-                        return true
-                    }
-
-                    let combinedPath = relativePath.isEmpty
-                        ? replacementFilename
-                        : relativePath + "/" + replacementFilename
-                    return combinedPath.caseInsensitiveCompare(targetPath) == .orderedSame
-                        || combinedPath.localizedCaseInsensitiveContains(targetPath + "/")
-                }
-
-                guard hasFreeFireTarget else { return false }
-            } else {
-                let targetPath = GameAssetFilter.freeFireMaxDirectory
-                let hasFreeFireMaxTarget = project.rules.contains { rule in
-                    let relativePath = rule.relativePath
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                    let replacementFilename = rule.replacementFilename
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
-                    if relativePath.caseInsensitiveCompare(targetPath) == .orderedSame {
-                        return true
-                    }
-
-                    let combinedPath = relativePath.isEmpty
-                        ? replacementFilename
-                        : relativePath + "/" + replacementFilename
-                    return combinedPath.caseInsensitiveCompare(targetPath) == .orderedSame
-                        || combinedPath.localizedCaseInsensitiveContains(targetPath + "/")
-                }
-
-                guard hasFreeFireMaxTarget else { return false }
-            }
-
-            guard !query.isEmpty else { return true }
+        guard !query.isEmpty else { return store.items }
+        return store.items.filter { item in
             if item.packageURL.lastPathComponent.localizedCaseInsensitiveContains(query) {
                 return true
             }
+            guard let project = item.project else { return false }
             if project.name.localizedCaseInsensitiveContains(query)
                 || project.author.localizedCaseInsensitiveContains(query) {
                 return true
             }
+            guard item.canInspectContents else { return false }
             return project.allBundleIdentifiers.contains {
                     $0.localizedCaseInsensitiveContains(query)
                 }
@@ -119,27 +55,6 @@ struct PatchProjectsView: View {
                     $0.relativePath.localizedCaseInsensitiveContains(query)
                         || $0.replacementFilename.localizedCaseInsensitiveContains(query)
                 }
-        }
-
-        var seenPackageIDs = Set<UUID>()
-        var seenPaths = Set<String>()
-        var seenNames = Set<String>()
-        return matchingItems.filter { item in
-            let path = item.packageURL.standardizedFileURL.path
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-            let filename = item.packageURL.lastPathComponent
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-            guard !seenPackageIDs.contains(item.id),
-                  !seenPaths.contains(path),
-                  !seenNames.contains(filename) else {
-                return false
-            }
-            seenPackageIDs.insert(item.id)
-            seenPaths.insert(path)
-            seenNames.insert(filename)
-            return true
         }
     }
 
@@ -156,22 +71,7 @@ struct PatchProjectsView: View {
     }
 
     private var hasSearchResults: Bool {
-        if selectedGame == .skins { return !filteredWallpaperPackages.isEmpty }
-        return !filteredItems.isEmpty
-    }
-
-    private var currentIOSVersion: String {
-        AppInfo.osVersion
-    }
-
-    private var currentIOSIsSupported: Bool {
-        let version = AppInfo.versionTuple
-        return ExploitSupportPolicy.isSupported(
-            major: version.major,
-            minor: version.minor,
-            patch: version.patch,
-            build: AppInfo.osBuild
-        )
+        !filteredItems.isEmpty || !filteredWallpaperPackages.isEmpty
     }
 
     init(
@@ -189,23 +89,13 @@ struct PatchProjectsView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                iosCompatibilityCard
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 14)
-
-                HStack(spacing: 9) {
-                    gameOptionButton(.freeFire)
-                    gameOptionButton(.freeFireMax)
-                    gameOptionButton(.skins)
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 18)
-
+            VStack(spacing: 0) {
+                AppSearchField(
+                    text: $searchText,
+                    prompt: language.text("installed.search"),
+                    clearLabel: language.text("common.clear")
+                )
+                Divider()
                 List {
                     if !hasLocalContent && (store.isBusy || isImportingWallpapers) {
                         loadingState
@@ -218,8 +108,8 @@ struct PatchProjectsView: View {
                             .listRowSeparator(.hidden)
                     } else {
                         if !filteredItems.isEmpty {
-                            Section {
-                                ForEach(filteredItems, id: \.packageURL.path) { item in
+                            Section(language.text("patch.title")) {
+                                ForEach(filteredItems) { item in
                                     itemRow(item)
                                 }
                                 .onDelete { offsets in
@@ -227,7 +117,7 @@ struct PatchProjectsView: View {
                                 }
                             }
                         }
-                        if selectedGame == .skins && !filteredWallpaperPackages.isEmpty {
+                        if !filteredWallpaperPackages.isEmpty {
                             Section(language.text("tab.wallpapers")) {
                                 ForEach(filteredWallpaperPackages) { package in
                                     NavigationLink {
@@ -255,21 +145,53 @@ struct PatchProjectsView: View {
                             }
                         }
                     }
+                    if cleanerEnabled {
+                        Section(language.text("repository.utilities")) {
+                            cleanerRow
+                        }
+                    }
                 }
-                .listStyle(.plain)
-                .scrollDisabled(true)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .listRowBackground(Color.clear)
-                .environment(\.defaultMinListRowHeight, 0)
-                }
+                .listStyle(.insetGrouped)
             }
-            .background(Color.clear)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-            }
-            .navigationTitle("")
+            .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            showCreate = true
+                        } label: {
+                            Label(language.text("patch.new"), systemImage: "doc.badge.plus")
+                        }
+                        Button {
+                            showImporter = true
+                        } label: {
+                            Label(language.text("patch.import"), systemImage: "square.and.arrow.down")
+                        }
+                        Button {
+                            showWallpaperImporter = true
+                        } label: {
+                            Label(
+                                language.text("wallpaper.import"),
+                                systemImage: "photo.badge.plus"
+                            )
+                        }
+                    } label: {
+                        if store.isBusy || isImportingWallpapers {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "plus")
+                        }
+                    }
+                    .disabled(store.isBusy || isImportingWallpapers)
+                    .accessibilityLabel(language.text("patch.add"))
+                }
+                AppUtilityToolbar(
+                    language: language,
+                    onOpenSettings: onOpenSettings,
+                    onOpenLogs: onOpenLogs
+                )
+            }
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
                     allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -294,6 +216,9 @@ struct PatchProjectsView: View {
                 ) { project, password in
                     store.create(project: project, password: password)
                 }
+            }
+            .sheet(isPresented: $showCleaner) {
+                CleanerView()
             }
             .sheet(item: $draftCoordinator.request) { request in
                 PatchProjectEditorView(
@@ -344,13 +269,6 @@ struct PatchProjectsView: View {
                     secondaryButton: .cancel(Text(language.text("common.cancel")))
                 )
             }
-            .alert(item: $store.alert) { alert in
-                Alert(
-                    title: Text(language.text(alert.titleKey)),
-                    message: Text(alert.message(language: language)),
-                    dismissButton: .default(Text(language.text("common.ok")))
-                )
-            }
             .onAppear {
                 reloadWallpaperPackages()
                 consumeExternalImport()
@@ -379,42 +297,6 @@ struct PatchProjectsView: View {
         }
     }
 
-    private func gameOptionButton(_ option: GameOption) -> some View {
-        let selected = selectedGame == option
-        let symbol: String = {
-            switch option {
-            case .freeFire, .freeFireMax: return "flame.fill"
-            case .skins: return "square.grid.2x2.fill"
-            }
-        }()
-        return Button {
-            selectedGame = option
-        } label: {
-            VStack(spacing: 9) {
-                Image(systemName: symbol)
-                    .font(.system(size: 25, weight: .bold))
-                Text(option.rawValue)
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
-                    .tracking(0.8)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-            .foregroundStyle(selected ? Color.white : Color.white.opacity(0.72))
-            .frame(maxWidth: .infinity)
-            .frame(height: 88)
-            .background {
-                RoundedRectangle(cornerRadius: 23, style: .continuous)
-                    .fill(selected ? AppTheme.accent : Color(red: 0.035, green: 0.035, blue: 0.04))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 23, style: .continuous)
-                    .stroke(selected ? Color.red.opacity(0.95) : Color.red.opacity(0.30), lineWidth: selected ? 1.5 : 0.8)
-            }
-            .shadow(color: selected ? AppTheme.accent.opacity(0.48) : .clear, radius: 14, y: 0)
-        }
-        .buttonStyle(.plain)
-    }
-
     private func consumeExternalImport() {
         guard let request = draftCoordinator.importRequest else { return }
         draftCoordinator.clearImport()
@@ -422,139 +304,52 @@ struct PatchProjectsView: View {
     }
 
     private func wallpaperRow(_ package: WallpaperStagedPackage) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             AppRowIcon(systemName: wallpaperSymbol)
-            Text(package.displayName)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-        }
-        .contentShape(Rectangle())
-        .padding(.vertical, 1)
-    }
-
-    private var iosCompatibilityCard: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 7) {
-                Image(systemName: "iphone")
-                    .foregroundStyle(Color.red)
-                Text("INFORMAÇÕES DO DISPOSITIVO")
-                    .font(.caption.weight(.bold))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(package.displayName)
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
-                Spacer(minLength: 0)
-            }
-
-            Divider().overlay(Color.white.opacity(0.12))
-
-            deviceInfoRow(
-                title: language.text("dashboard.hardware_model"),
-                value: AppInfo.hardwareDisplayName,
-                icon: "smartphone"
-            )
-
-            deviceInfoRow(
-                title: language.text("settings.ios_version"),
-                value: "iOS \\(currentIOSVersion)",
-                icon: "gear"
-            )
-
-            HStack(spacing: 7) {
-                Image(systemName: currentIOSIsSupported ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundStyle(currentIOSIsSupported ? .green : .red)
-                Text(language.text("ios.compatibility_status"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 4)
-                Text(currentIOSIsSupported
-                     ? language.text("ios.compatible")
-                     : language.text("ios.not_compatible"))
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(currentIOSIsSupported ? .green : .red)
+                    .lineLimit(1)
+                InstalledContentKindBadge(kind: .wallpaper, language: language)
+                Text(language.text(
+                    "wallpaper.package_summary",
+                    Int64(package.payload.descriptors.count),
+                    ByteCountFormatter.string(
+                        fromByteCount: package.payload.totalBytes,
+                        countStyle: .file
+                    )
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color(red: 0.045, green: 0.045, blue: 0.045), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\\(AppInfo.hardwareDisplayName), iOS \\(currentIOSVersion), " +
-            (currentIOSIsSupported
-             ? language.text("ios.compatible")
-             : language.text("ios.not_compatible"))
-        )
-    }
-
-    private func deviceInfoRow(title: String, value: String, icon: String) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: icon)
-                .foregroundStyle(.secondary)
-                .frame(width: 16)
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 4)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-    }
-
-    private func sizeText(_ bytes: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        .padding(.vertical, 4)
     }
 
     private var cleanerRow: some View {
         Button {
-            guard !isCleaningWithCard else { return }
-            isCleaningWithCard = true
-            CleanerView.performOneTapCleanup()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                isCleaningWithCard = false
-            }
+            showCleaner = true
         } label: {
             HStack(spacing: 12) {
-                AppRowIcon(systemName: "trash.fill")
+                AppRowIcon(systemName: "sparkles")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(language.text("tab.cleaner"))
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text(
-                        cleanerLastFoundBytes > 0
-                            ? language.text("cleaner.found_on_card", sizeText(Int64(cleanerLastFoundBytes)))
-                            : language.text("repository.cleaner_subtitle")
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(language.text("repository.cleaner_subtitle"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if isCleaningWithCard {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: "trash.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 14)
-            .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.07), lineWidth: 0.7)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .listRowBackground(Color.clear)
     }
 
     private var wallpaperSymbol: String {
@@ -625,132 +420,16 @@ struct PatchProjectsView: View {
 
     @ViewBuilder
     private func itemRow(_ item: PatchLibraryItem) -> some View {
-        Group {
-            if item.isLocked {
-                Button {
-                    store.requestUnlock(for: item)
-                } label: {
-                    PatchProjectRow(item: item, language: language, subtitle: selectedGame.rawValue)
-                }
-                .buttonStyle(.plain)
-            } else {
-                HStack(spacing: 12) {
-                    PatchProjectRow(item: item, language: language, subtitle: selectedGame.rawValue)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    let isActive = DevicePatchService.latestReceipt(projectID: item.id) != nil
-                    Button {
-                        setPatchActive(!isActive, for: item)
-                    } label: {
-                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 23, weight: .semibold))
-                            .foregroundStyle(isActive ? AppTheme.accent : Color.white.opacity(0.48))
-                                    .frame(width: 34, height: 34)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isActive ? "Desativar" : "Ativar")
-                    .accessibilityAddTraits(.isButton)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 13)
-                .background(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color.black)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
-                }
+        if item.isLocked {
+            Button { store.requestUnlock(for: item) } label: {
+                PatchProjectRow(item: item, language: language)
             }
-        }
-        .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
-    }
-
-    private func setPatchActive(_ enabled: Bool, for item: PatchLibraryItem) {
-        guard !item.isLocked, !store.isBusy else { return }
-
-        if enabled {
-            applyPatchFromHome(item)
+            .buttonStyle(.plain)
         } else {
-            restorePatchFromHome(item)
-        }
-    }
-
-    private func applyPatchFromHome(_ item: PatchLibraryItem) {
-        guard let baseProject = item.project else { return }
-        Task.detached(priority: .userInitiated) {
-            do {
-                var project = item.summary.schemaVersion >= 2 && item.canInspectContents
-                    ? try PatchProjectLibrary.synchronizeWorkspace(item: item)
-                    : baseProject
-                _ = try DevicePatchService.apply(project: project)
-                await MainActor.run {
-                    store.reload()
-                    store.alert = PatchStoreAlert(
-                        titleKey: "common.done",
-                        messageKey: "patch.applied_message"
-                    )
-                }
-            } catch let error as PatchPackageError {
-                await MainActor.run {
-                    store.alert = PatchStoreAlert(
-                        titleKey: "common.failed",
-                        messageKey: privateErrorKey(for: error, item: item),
-                        messageArgument: privateErrorArgument(for: error, item: item)
-                    )
-                }
-            } catch {
-                await MainActor.run {
-                    store.alert = PatchStoreAlert(
-                        titleKey: "common.failed",
-                        messageKey: "patch.error.apply"
-                    )
-                }
-            }
-        }
-    }
-
-    private func restorePatchFromHome(_ item: PatchLibraryItem) {
-        guard let receipt = DevicePatchService.latestReceipt(projectID: item.id) else { return }
-        Task.detached(priority: .userInitiated) {
-            do {
-                let inspection = try DevicePatchService.inspectRestore(receipt: receipt)
-                guard inspection.changedTargets.isEmpty else {
-                    await MainActor.run {
-                        store.alert = PatchStoreAlert(
-                            titleKey: "common.failed",
-                            messageKey: "patch.restore_changed_message",
-                            messageArgument: String(inspection.changedTargets.count)
-                        )
-                    }
-                    return
-                }
-                try DevicePatchService.restore(receipt: receipt)
-                await MainActor.run {
-                    store.reload()
-                    store.alert = PatchStoreAlert(
-                        titleKey: "common.done",
-                        messageKey: "patch.restored_message"
-                    )
-                }
-            } catch let error as PatchPackageError {
-                await MainActor.run {
-                    store.alert = PatchStoreAlert(
-                        titleKey: "common.failed",
-                        messageKey: privateErrorKey(for: error, item: item),
-                        messageArgument: privateErrorArgument(for: error, item: item)
-                    )
-                }
-            } catch {
-                await MainActor.run {
-                    store.alert = PatchStoreAlert(
-                        titleKey: "common.failed",
-                        messageKey: "patch.error.restore"
-                    )
-                }
+            NavigationLink {
+                PatchProjectDetailView(store: store, projectID: item.id)
+            } label: {
+                PatchProjectRow(item: item, language: language)
             }
         }
     }
@@ -800,23 +479,6 @@ struct PatchProjectsView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 64)
     }
-    private func privateErrorKey(for error: PatchPackageError, item: PatchLibraryItem) -> String {
-        guard item.project?.isPrivate == true,
-              item.isAuthorCopy == false else {
-            return error.localizationKey
-        }
-        return "patch.error.private_operation"
-    }
-
-    private func privateErrorArgument(for error: PatchPackageError, item: PatchLibraryItem) -> String? {
-        guard item.project?.isPrivate == true,
-              item.isAuthorCopy == false else {
-            return error.localizationArgument
-        }
-        return nil
-    }
-
-
 }
 
 private struct WallpaperImportFeedback: Identifiable {
@@ -828,32 +490,55 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
-    let subtitle: String
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "doc.fill")
-                .font(.system(size: 25, weight: .regular))
-                .foregroundStyle(Color.red)
-                .shadow(color: Color.red.opacity(0.55), radius: 7, y: 0)
-                .frame(width: 48, height: 48)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 5) {
+            AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
+            VStack(alignment: .leading, spacing: 3) {
                 Text(item.project?.name ?? language.text("patch.locked_project"))
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.white)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
-
-                Text(subtitle)
-                    .font(.subheadline.weight(.heavy))
-                    .foregroundStyle(Color.red)
-                    .lineLimit(1)
+                InstalledContentKindBadge(kind: .patch, language: language)
+                if let author = item.project?.author, !author.isEmpty {
+                    Text(language.text("patch.by_author", author))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(rowDetail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-
-            Spacer(minLength: 4)
+            Spacer()
+            if item.summary.isPasswordProtected {
+                Image(systemName: "key.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(language.text("patch.password_protected"))
+            }
+            if item.project?.isPrivate == true {
+                Image(systemName: "eye.slash.fill")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.accent)
+                    .accessibilityLabel(language.text("patch.private"))
+            }
         }
-        .contentShape(Rectangle())
+        .padding(.vertical, 4)
+    }
+
+    private var rowDetail: String {
+        if item.isLocked {
+            return language.text("patch.tap_to_unlock")
+        }
+        if item.project?.isPrivate == true, !item.isAuthorCopy {
+            return language.text("patch.private_received")
+        }
+        return language.text(
+            item.summary.schemaVersion >= 2
+                ? "patch.workspace_items_count"
+                : "patch.rules_count",
+            Int64((item.project?.rules.count ?? 0) + (item.project?.directories.count ?? 0))
+        )
     }
 }
 
@@ -1083,11 +768,12 @@ private struct PatchProjectDetailView: View {
                             } label: {
                                 HStack(spacing: 10) {
                                     ruleSummary(rule)
-                                    Spacer(minLength: 4)
+                                    Spacer(minLength: 8)
                                     Image(systemName: "chevron.right")
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(.tertiary)
                                 }
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityHint(language.text("patch.edit_rule_hint"))
@@ -1303,12 +989,9 @@ private struct PatchProjectDetailView: View {
         isWorking = true
         Task.detached(priority: .userInitiated) {
             do {
-                var project = item.summary.schemaVersion >= 2 && item.canInspectContents
+                let project = item.summary.schemaVersion >= 2 && item.canInspectContents
                     ? try PatchProjectLibrary.synchronizeWorkspace(item: item)
                     : baseProject
-                project.rules = project.rules.filter {
-                    PatchRuleActivationStore.shared.isEnabled($0.id)
-                }
                 _ = try DevicePatchService.apply(project: project)
                 await MainActor.run {
                     store.reload()

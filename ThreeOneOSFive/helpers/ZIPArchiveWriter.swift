@@ -14,6 +14,8 @@ struct ZIPArchiveWriteResult: Equatable {
     let sourceBytes: Int64
 }
 
+/// A dependency-free ZIP writer for the file browser. Entries are stored
+/// without compression so content can be streamed instead of loaded into RAM.
 enum ZIPArchiveWriter {
     private struct Entry {
         let sourceURL: URL

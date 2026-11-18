@@ -14,7 +14,7 @@ private enum OnboardingNavigationDirection {
 
 struct OnboardingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.portugueseBrazil.rawValue
+    @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
     @State private var step: OnboardingStep = .language
     @State private var navigationDirection: OnboardingNavigationDirection = .forward
     var onComplete: () -> Void
@@ -440,6 +440,7 @@ enum OnboardingStore {
         return "\(v) (\(b))"
     }
 
+    /// Per-install token: executable mtime changes on every overwrite even if version stays the same.
     static var bundleToken: String {
         if let exe = Bundle.main.executablePath,
            let attrs = try? FileManager.default.attributesOfItem(atPath: exe),
@@ -464,6 +465,8 @@ enum OnboardingStore {
     }
 
     static func shouldShow() -> Bool {
+        return false
+
 #if targetEnvironment(simulator)
         if ProcessInfo.processInfo.arguments.contains("--skip-onboarding") { return false }
         if ProcessInfo.processInfo.arguments.contains("--reset-onboarding") { return true }
@@ -472,8 +475,10 @@ enum OnboardingStore {
         if let stored = completedFingerprint, !stored.isEmpty {
             return stored != fp
         }
+        // Migration: old installs only have completedVersion
         if let completed = completedVersion, !completed.isEmpty {
             if completed == currentVersion {
+                // Same version, migrate silently — next overwrite will be detected via fingerprint
                 UserDefaults.standard.set(fp, forKey: completedFingerprintKey)
                 return false
             }

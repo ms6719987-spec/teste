@@ -2,6 +2,7 @@ import Foundation
 import Darwin
 import UIKit
 
+// MARK: - Models
 
 struct InstalledApp: Identifiable, Hashable {
     let bundleID: String
@@ -61,6 +62,7 @@ struct FileEntry: Identifiable, Hashable {
     }
 }
 
+// MARK: - Store
 
 enum ContainerStore {
     static let appDataRoot = "/var/mobile/Containers/Data/Application"
@@ -101,6 +103,10 @@ enum ContainerStore {
         let detail = lookupError.map(String.init) ?? "unavailable"
         log("patch: MHA-C2 could not resolve \(bundleID), detail=\(detail)")
 
+        // Fallback for iOS builds where MCM refuses to hand out sandbox
+        // tokens (e.g. iOS 18.1.x): scan the app-data root with the inode
+        // walk and read each container's MCM metadata plist directly. The
+        // raw reads only succeed when the sandbox escape is active.
         if let scanned = resolveAppContainerPathByMetadataScan(bundleID: bundleID) {
             log("patch: filesystem metadata scan resolved \(bundleID)")
             return scanned
@@ -109,6 +115,7 @@ enum ContainerStore {
     }
 
     static func resolveAppContainerPathByMetadataScan(bundleID: String) -> String? {
+        // iOS < 26: kernel R/W is enough, no need to require full sandbox escape
         if KernelExploit.requiresSandboxEscape, !KernelExploit.hasSandboxAccess() {
             log("patch: metadata scan skipped — sandbox access not active")
             return nil
@@ -129,6 +136,7 @@ enum ContainerStore {
         return nil
     }
 
+    // MARK: Primary — MobileInstallation / LSApplicationWorkspace
 
     static func installedAppsFromAPI() -> [InstalledApp] {
         let raw = installedAppInfo() as? [String: [String: Any]] ?? [:]
@@ -145,6 +153,7 @@ enum ContainerStore {
                     missingContainer += 1
                 }
             }
+            // Skip entries we cannot browse — empty path is dropped by mergers anyway.
             guard !containerPath.isEmpty else { continue }
             apps.append(InstalledApp(
                 bundleID: bundleID,
@@ -229,6 +238,7 @@ enum ContainerStore {
         return apps
     }
 
+    // MARK: LaunchServices store discovery
 
     static func installedAppsFromMHACandidates(
         identifiers: [String],
@@ -361,12 +371,17 @@ enum ContainerStore {
             ? enumerateDirectories(path: systemDataRoot)
             : traversedSystemDirectories
         for directory in systemDirectories {
+            // Attempt the raw metadata read even without a traversal grant:
+            // it succeeds when the sandbox escape is active, which is the
+            // only path left when MCM/bad_query grants are denied.
             guard readContainerMetadata(containerPath: directory)?.bundleID == "com.apple.lsd" else {
                 continue
             }
             addCachePath((directory as NSString).appendingPathComponent("Library/Caches"))
         }
 
+        // Older and Simulator layouts keep the same store outside the MCM
+        // service-container layout. They are harmless fallbacks on device.
         addCachePath("/var/db/lsd")
         addCachePath("/var/mobile/Library/Caches")
 
@@ -425,6 +440,7 @@ enum ContainerStore {
         return UUID(uuidString: (canonicalPath as NSString).lastPathComponent) != nil
     }
 
+    // MARK: Filesystem discovery
 
     static func enumerateDirectories(path: String, maxInode: Int64 = 2_000_000) -> [String] {
         let clean = path.hasSuffix("/") ? String(path.dropLast()) : path
@@ -546,6 +562,9 @@ enum ContainerStore {
     ) -> InstalledApp? {
         guard UUID(uuidString: fallback.bundleID) != nil else { return fallback }
 
+        // Read the MCM metadata plist directly. With the sandbox escape
+        // active the raw read succeeds even when every MCM/bad_query grant
+        // is denied; without it the read simply fails and we fall through.
         if let metadata = readContainerMetadata(containerPath: fallback.containerPath) {
             let bundleID = metadata.bundleID.trimmingCharacters(in: .whitespacesAndNewlines)
             if ContainerBundleCandidateResolver.isValidBundleIdentifier(bundleID),
@@ -689,6 +708,7 @@ enum ContainerStore {
         return result
     }
 
+    // MARK: File browsing
 
     static func listFiles(at path: String) -> [FileEntry] {
         let fm = FileManager.default

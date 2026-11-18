@@ -1,15 +1,21 @@
 import SwiftUI
 
 enum AppTheme {
-    static let accent = Color(red: 0.92, green: 0.08, blue: 0.10)
-    static let pageBackground = Color(red: 0.055, green: 0.018, blue: 0.026)
-    static let consoleBackground = Color(red: 0.035, green: 0.012, blue: 0.018)
+    static let accent = Color(
+        uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 1.00, green: 0.64, blue: 0.42, alpha: 1.00)
+                : UIColor(red: 0.85, green: 0.42, blue: 0.20, alpha: 1.00)
+        }
+    )
+    static let pageBackground = Color(uiColor: .systemBackground)
+    static let consoleBackground = Color(uiColor: .secondarySystemBackground)
     static let pageInset: CGFloat = 16
     static let rowIconSize: CGFloat = 17
     static let rowIconFrame: CGFloat = 28
     static let fileRowIconSize: CGFloat = 17
-    static let fileRowIconFrame: CGFloat = 26
-    static let fileRowHeight: CGFloat = 52
+    static let fileRowIconFrame: CGFloat = 30
+    static let fileRowHeight: CGFloat = 60
     static let appIconSize: CGFloat = 32
     static let emptyIconSize: CGFloat = 30
     static let selectionIconSize: CGFloat = 18
@@ -24,68 +30,11 @@ struct AppCardBorder: View {
             cornerRadius: AppTheme.contentCardCornerRadius,
             style: .continuous
         )
-        .strokeBorder(Color.clear, lineWidth: 0)
+        .strokeBorder(
+            Color(uiColor: .separator).opacity(0.22),
+            lineWidth: 0.5
+        )
         .accessibilityHidden(true)
-    }
-}
-
-
-
-struct RainGlassBackground: View {
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.075, green: 0.018, blue: 0.030),
-                    Color(red: 0.030, green: 0.012, blue: 0.018),
-                    Color(red: 0.055, green: 0.014, blue: 0.022)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            RadialGradient(
-                colors: [
-                    AppTheme.accent.opacity(0.22),
-                    AppTheme.accent.opacity(0.07),
-                    .clear
-                ],
-                center: .top,
-                startRadius: 12,
-                endRadius: 420
-            )
-            RadialGradient(
-                colors: [AppTheme.accent.opacity(0.10), .clear],
-                center: .bottomTrailing,
-                startRadius: 8,
-                endRadius: 300
-            )
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
-    }
-}
-
-struct GlassPanel<Content: View>: View {
-    let cornerRadius: CGFloat
-    @ViewBuilder let content: () -> Content
-
-    init(cornerRadius: CGFloat = 18, @ViewBuilder content: @escaping () -> Content) {
-        self.cornerRadius = cornerRadius
-        self.content = content
-    }
-
-    var body: some View {
-        content()
-            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.018))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.clear, lineWidth: 0)
-            }
-            .shadow(color: AppTheme.accent.opacity(0.10), radius: 18, y: 8)
     }
 }
 
@@ -140,14 +89,13 @@ struct AppSearchField: View {
         }
         .padding(.horizontal, 11)
         .frame(minHeight: 36)
-        .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(Color.clear, lineWidth: 0)
-        }
+        .background(
+            Color(uiColor: .secondarySystemFill),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
         .padding(.horizontal, AppTheme.pageInset)
         .padding(.vertical, 8)
-        .background(Color.clear)
+        .background(.bar)
     }
 }
 

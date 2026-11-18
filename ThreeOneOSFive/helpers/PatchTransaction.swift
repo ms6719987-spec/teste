@@ -316,6 +316,7 @@ enum PatchTransaction {
                 journal.status = .rolledBack
                 try writeJournal(journal, to: journalURL)
             } catch {
+                // Preserve the prepared journal and backups for explicit recovery.
             }
             throw PatchPackageError.applyFailed
         }
@@ -734,6 +735,7 @@ enum PatchTransaction {
                 }
                 try? fileManager.removeItem(at: recoveryDirectory)
             } catch {
+                // Keep the recovery directory when rollback cannot complete.
                 throw PatchPackageError.restoreFailed
             }
             throw error
