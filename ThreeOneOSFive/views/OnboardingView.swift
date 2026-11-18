@@ -465,8 +465,6 @@ enum OnboardingStore {
     }
 
     static func shouldShow() -> Bool {
-        return false
-
 #if targetEnvironment(simulator)
         if ProcessInfo.processInfo.arguments.contains("--skip-onboarding") { return false }
         if ProcessInfo.processInfo.arguments.contains("--reset-onboarding") { return true }
